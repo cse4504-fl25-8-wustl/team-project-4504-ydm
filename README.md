@@ -22,104 +22,92 @@ absolutely 👍 let’s make it **pretty** and **specific** for each student. yo
 
 ```
 src/
-├─ app/                          # Next.js App Router (routes & UI)
-│  └─ pack/                      # Feature: Packing Planner
-│     ├─ page.tsx                # Student 3 – Page layout (Server Component)
-│     ├─ actions.ts              # Student 2 – Server actions (wires engine + cost)
-│     ├─ loading.tsx             # (optional) route-level skeleton
-│     ├─ error.tsx               # (optional) route-level error UI
-│     │
-│     ├─ components/             # UI for this feature
-│     │  ├─ InputForm.tsx        # Student 3 – "use client" form (calls actions.ts)
-│     │  └─ PlanView.tsx         # Student 3 – Display results (items, boxes, containers)
-│     │
-│     ├─ data/                   # Server-only data helpers
-│     │  ├─ getCatalogs.ts       # Student 2 – Provide box/pallet/crate catalogs
-│     │  ├─ getPlan.ts           # Student 2 – Fetch saved plan (optional)
-│     │  └─ savePlan.ts          # Student 2 – Persist plan (optional)
-│     │
-│     ├─ domain/                 # Pure domain logic (no framework code)
-│     │  ├─ entities/            # Student 1 – Core business entities
-│     │  │  ├─ Item.ts           # Item entity
-│     │  │  ├─ Box.ts            # BoxType + PackedBox
-│     │  │  ├─ Container.ts      # PalletType + CrateType + PackedContainer
-│     │  │  └─ Output.ts         # ShipmentTotals + PackingResult
-│     │  │
-│     │  ├─ dto/                 # Student 2 – Input/Output DTOs
-│     │  │  ├─ PackInputDTO.ts   # Request object (form/client payload)
-│     │  │  └─ PackOutputDTO.ts  # Response object (server → UI)
-│     │  │
-│     │  ├─ engine.ts            # Student 1 – Packing algorithms
-│     │  ├─ cost.ts              # Student 2 – Cost calculation per ARCH rules
-│     │  └─ validate.ts          # Student 2 – zod schemas & unit normalization
-│     │
-│     └─ rules/                  # ARCH Design Business Rules (policy)
-│        ├─ archRules.ts         # Student 1 – Policy interface
-│        └─ profiles/
-│           ├─ standard.ts       # Student 1 – Default ARCH profile
-│           └─ fragileFirst.ts   # Student 1 – Alternative profile example
+├─ app/
+│  └─ api/
+│     └─ pack/
+│        └─ route.ts                # [Student 2]  API endpoint (POST /api/pack)
 │
-├─ components/                   # Shared UI using shadcn/ui
-│  └─ ui/
-│     ├─ Table.tsx               # Student 3 – Display tabular data
-│     └─ Badge.tsx               # Student 3 – Status badges
+├─ app/pack/                        # Feature: Packing Planner (logic + rules)
+│  ├─ actions.ts                    # [Student 2]  Server entry (alt to API)
+│  │
+│  ├─ data/                         # Server-only data helpers
+│  │  └─ getCatalogs.ts             # [Student 3]  Provide box/pallet/crate catalogs
+│  │
+│  ├─ domain/                       # Pure domain logic
+│  │  ├─ entities/                  # [Student 1]  Core business entities
+│  │  │  ├─ Item.ts                 # Item entity
+│  │  │  ├─ Box.ts                  # BoxType + PackedBox
+│  │  │  ├─ Container.ts            # PalletType + CrateType + PackedContainer
+│  │  │  └─ Output.ts               # ShipmentTotals + PackingResult
+│  │  │
+│  │  ├─ dto/                       # [Student 2]  Input/Output DTOs
+│  │  │  ├─ PackInputDTO.ts         # Request shape (JSON)
+│  │  │  └─ PackOutputDTO.ts        # Response shape (JSON)
+│  │  │
+│  │  ├─ engine.ts                  # [Student 1]  Packing algorithms
+│  │  ├─ cost.ts                    # [Student 2]  Cost calculation per ARCH rules
+│  │  └─ validate.ts                # [Student 2]  Zod schemas & unit normalization
+│  │
+│  └─ rules/                        # [Student 1]  ARCH Design Business Rules
+│     ├─ archRules.ts               # Policy interface
+│     └─ profiles/
+│        ├─ standard.ts             # Default ARCH profile
+│        └─ fragileFirst.ts         # Alternate profile example
 │
-├─ lib/                          # Shared helpers/tools
-│  ├─ units.ts                   # Student 2 – Converters (lb↔kg, in↔cm)
-│  └─ id.ts                      # Student 2 – ID generation
-│--------------------------------------------------------------------------------- # do this part later
-├─ server/                       # Server-only utilities (no React)
-│  ├─ db.ts                      # Student 2 – DB client (if persistence added)
-│  └─ env.ts                     # Student 2 – zod-validated env loader
+├─ lib/
+│  ├─ units.ts                      # [Student 3]  Unit converters (lb↔kg, in↔cm)
+│  └─ id.ts                         # [Student 3]  ID generation utilities
 │
-└─ middleware.ts                 # (optional) global middleware
+│
+└─ scripts/
+   └─ run-pack.mjs                  # [Student 2]  CLI script to run packing offline
 ```
 
 ---
 
-# Responsibilities
+# 👩‍💻 Responsibilities
 
-### Student 1 – **Domain & Packing Logic**
+### 🎓 Student 1 – **Domain & Packing Logic**
 
-* Define entities and types: `Item`, `BoxType`, `PalletType`, `CrateType`, `PackedBox`, `PackedContainer`.
-* Implement packing algorithms:
+**Tasks**
 
-  * `packItemsToBoxes()` → groups items into boxes.
-  * `packBoxesToContainers()` → groups boxes into crates/pallets.
-* Maintain rules engine (`archRules.ts` + `profiles/*`).
-* Ensure outputs include:
+* Define **entities**: Item, Box, Container, Output.
+* Implement **packing algorithms**:
 
-  * Item weights
-  * Items → Boxes (with box weights)
-  * Boxes → Containers (with container weights & heights)
+  * `packItemsToBoxes()` → group items into boxes.
+  * `packBoxesToContainers()` → group boxes into crates/pallets.
+* Implement **ARCH rules policies** (standard + fragile-first).
+* Ensure all outputs are computed:
 
----
-
-### Student 2 – **Validation, Data & Costs**
-
-* Validate inputs with Zod (`validate.ts`).
-* Normalize units (`lib/units.ts`).
-* Provide catalogs (`data/getCatalogs.ts`).
-* Implement cost calculation (`domain/cost.ts`) based on ARCH rules.
-* Wire everything in `actions.ts`:
-
-  * Validate input
-  * Run Student 1’s engine
-  * Compute totals & costs
-  * Return structured output
-* (Optional) persistence: `getPlan.ts`, `savePlan.ts`, DB client
+  1. Item weights
+  2. Items → Boxes (with box weights)
+  3. Boxes → Containers (with container weights & heights)
+  4. Total shipment weight
 
 ---
 
-### Student 3 – **UI & Presentation**
+### 🎓 Student 2 – **Validation, Costs & Orchestration**
 
-* Build form (`InputForm.tsx`) to submit items.
-* Use [Shadcn/ui](https://ui.shadcn.com/docs/installation/next)
-* Build results view (`PlanView.tsx`) to show:
+**Tasks**
 
-  * Item weights
-  * Box groupings & weights
-  * Container groupings, weights & heights
-  * Total shipment weight
-* Create clean tables and badges using shared UI (`components/ui/*`).
-* Assemble page layout (`page.tsx`) with form + results.
+* Define **DTOs** (input + output shapes).
+* Validate and normalize input using **Zod** (`validate.ts`).
+* Compute **costs** per ARCH rules (`cost.ts`).
+* Implement orchestration:
+
+  * `actions.ts` (server action)
+  * `route.ts` (API endpoint, POST /api/pack)
+  * `run-pack.mjs` (CLI runner for JSON input)
+* Return complete `PackOutputDTO` with items, boxes, containers, totals, and cost.
+
+---
+
+### 🎓 Student 3 – **Data, Helpers & Infrastructure**
+
+**Tasks**
+
+* Provide **catalog data** (box/pallet/crate definitions).
+* Build shared **utility functions**:
+
+  * `units.ts` (lb↔kg, in↔cm converters)
+  * `id.ts` (ID generation)
