@@ -114,6 +114,7 @@ src/
 ### Student 3 – **UI & Presentation**
 
 * Build form (`InputForm.tsx`) to submit items.
+* Use [Shadcn/ui](https://ui.shadcn.com/docs/installation/next)
 * Build results view (`PlanView.tsx`) to show:
 
   * Item weights
