@@ -6,7 +6,7 @@ export interface Dimensions {
 
 export class Art {
   public getProductType(): string {
-    return "";
+    return ""; // enum ArtType { Painting, Canvas, TactilePanel }
   }
 
   public getDimensions(): Dimensions {

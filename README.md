@@ -1,8 +1,14 @@
 # team-project-4504-ydm
 team-project-4504-ydm was created by GitHub Classroom.
 
-## Hello World (Next.js + pnpm)
-The repository ships with a minimal Next.js App Router page located at `app/page.tsx` that renders a simple Hello World view.
+## Command-line Hello World
+Run the CLI script to print a greeting in the terminal:
+```bash
+pnpm hello
+```
+
+## Next.js Shell
+A minimal Next.js App Router page remains in `app/page.tsx` to host the broader guided design work.
 
 ### Install dependencies
 ```bash
@@ -14,4 +20,4 @@ pnpm install
 pnpm dev
 ```
 
-Open the URL printed in the terminal (defaults to `http://localhost:3000`) to see the page.
+Open the URL printed in the terminal (defaults to `http://localhost:3000`).

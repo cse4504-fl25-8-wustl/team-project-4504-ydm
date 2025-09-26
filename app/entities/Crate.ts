@@ -13,7 +13,7 @@ export class Crate {
     return false;
   }
 
-  public getRemainingCapacity(): number {
+  public getRemainingCapacity(): number { // how many more boxes can fit
     return 0;
   }
 
