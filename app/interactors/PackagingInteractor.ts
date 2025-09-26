@@ -1,6 +1,8 @@
 import { Art } from "../entities/Art";
 import { Box } from "../entities/Box";
 import { Crate } from "../entities/Crate";
+import { PackagingRequest } from "../requests/PackagingRequest";
+import { PackagingResponse } from "../responses/PackagingResponse";
 
 /**
  * PackagingInteractor centralizes both box-packing and crate-packing use cases.
@@ -16,12 +18,6 @@ export interface CratePackingResult {
   crates: Crate[];
   unassignedBoxes: Box[];
 }
-
-/** Placeholder for the eventual request DTO. */
-export interface PackagingRequest {}
-
-/** Placeholder for the eventual response DTO. */
-export interface PackagingResponse {}
 
 export class PackagingInteractor {
   /** Executes the box-packing algorithm for a collection of art pieces. */
@@ -54,6 +50,11 @@ export class PackagingInteractor {
 
   /** High-level use case that will orchestrate both algorithms. */
   public packageEverything(request: PackagingRequest): PackagingResponse {
-    return {};
+    return {
+      itemSummaries: [],
+      boxSummaries: [],
+      containerSummaries: [],
+      totalShipmentWeight: 0,
+    };
   }
 }
