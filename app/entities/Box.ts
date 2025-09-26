@@ -1,6 +1,8 @@
 import { Art } from "./Art";
 
 export class Box {
+  private readonly contents: Art[] = [];
+
   public canAccommodate(art: Art): boolean {
     // Business rule A.i-A.ii: enforce product-specific capacity limits before accepting art.
     // Business rule B: reject art pieces exceeding 44 inches that require custom packaging.
@@ -9,7 +11,12 @@ export class Box {
 
   public addArt(art: Art): boolean {
     // Business rule C: flag tactile panels and raised float mounts for special handling.
+    this.contents.push(art);
     return false;
+  }
+
+  public getContents(): Art[] {
+    return [...this.contents];
   }
 
   public isAtCapacity(): boolean {
