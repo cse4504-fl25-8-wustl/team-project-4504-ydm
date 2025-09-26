@@ -1,8 +1,9 @@
+
 /**
  * Output DTO for packing calculation results
  * Matches the required output format from project specifications
  */
-
+import { MaterialType } from "./PackInputDTO";
 export interface PackOutputDTO {
   // Project summary
   workOrder: string;
@@ -14,6 +15,7 @@ export interface PackOutputDTO {
     totalArtworkWeight: number; // lbs
     totalPackagingWeight: number; // lbs
     finalShipmentWeight: number; // lbs
+    
     weightBreakdown: {
       glassFramedPrints?: number;
       oversizedPieces?: number;
@@ -22,32 +24,48 @@ export interface PackOutputDTO {
     };
   };
   
-  // Packing summary
   packingSummary: {
     boxRequirements: {
-      standardBoxes: number; // 37"×11"×31"
-      largeBoxes: number; // 44"×13"×48"
+      standardBoxes: number;
+      largeBoxes: number;
       totalBoxes: number;
     };
     containerRequirements: {
-      standardPallets: number; // 48"×40"
-      oversizePallets: number; // 60"×40"
+      standardPallets: number;
+      oversizePallets: number;
       crates: number;
     };
     finalDimensions: PackedContainer[];
-    hardwareCalculation: HardwareSummary;
+    hardwareCalculation: {
+      lineItemHardware: Array<{
+        hardwareType: string;
+        quantity: number;
+      }>;
+      wallHardwareNeeded: {
+        drywallAnchors: number;
+        screws: number;
+        tBolts: number;
+      };
+    };
   };
-  
-  // Business intelligence
   businessIntelligence: {
     clientSpecificRulesApplied: string[];
-    oversizedItemsFlagged: OversizedItem[];
-    specialFinalMediumsFlagged: SpecialMedium[];
+    oversizedItemsFlagged: Array<{
+      dimensions: string;
+      quantity: number;
+      weight: number;
+      requiresLargeBox: boolean;
+    }>;
+    specialFinalMediumsFlagged: Array<{
+      finalMedium: string;
+      quantity: number;
+      url?: string;
+      isHighValue: boolean;
+    }>;
     alternativeRecommendations: string[];
     riskFlags: string[];
   };
-  
-  // Freight carrier export
+
   freightCarrierExport: {
     subject: string;
     shipmentDetails: {
@@ -83,7 +101,9 @@ export interface PackedItem {
     height: number;
   };
   weight: number;
-  materialType: string;
+
+  materialType: MaterialType;
+
   isOversized: boolean;
   requiresLargeBox: boolean;
   glazing?: string;
@@ -98,7 +118,22 @@ export interface PackedBox {
     width: number;
     height: number;
   };
-  items: PackedItem[];
+
+  // items: PackedItem[];
+
+  items: Array<{
+    lineNumber: number;
+    tagNumber: number;
+    quantity: number;
+    finalMedium: string;
+    weight: number;
+    materialType: MaterialType;
+    isOversized: boolean;
+    requiresLargeBox: boolean;
+    glazing?: string;
+    hardware?: string;
+  }>;
+
   totalWeight: number;
   piecesCount: number;
 }
@@ -115,6 +150,7 @@ export interface PackedContainer {
   boxes: PackedBox[];
   totalWeight: number;
 }
+
 
 export interface HardwareSummary {
   lineItemHardware: Array<{

@@ -1,3 +1,4 @@
+
 /**
  * Input DTO for packing calculation requests
  * Based on Excel data format and project requirements
@@ -17,6 +18,7 @@ export interface PackInputDTO {
     liftgateRequired: boolean;
     insideDeliveryNeeded: boolean;
   };
+
   
   // Service type
   serviceType: "Delivery + Installation" | "Delivery Only" | "Pickup Only";
@@ -35,9 +37,11 @@ export interface PackItemInput {
   glazing?: string; // e.g., "Regular Glass", "Acrylic", or empty for no glazing
   frame1Moulding?: string; // e.g., "475130-BX"
   hardware?: string; // e.g., "4 pt Sec", "3 pt Sec"
+  piecesPerSet?: number; // 
 }
 
 // Material weight constants (lbs per square inch)
+
 export const MATERIAL_WEIGHTS = {
   GLASS: 0.0098,
   ACRYLIC: 0.0094,
