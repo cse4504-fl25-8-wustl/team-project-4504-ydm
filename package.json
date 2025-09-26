@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "hello": "node cli/hello.mjs"
+    "package": "tsx cli/main.ts"
   },
   "dependencies": {
     "next": "15.5.3",
@@ -20,6 +20,7 @@
     "@types/react-dom": "19.1.9",
     "eslint": "9.14.0",
     "eslint-config-next": "15.5.3",
+    "tsx": "4.15.7",
     "typescript": "5.9.2"
   }
 }

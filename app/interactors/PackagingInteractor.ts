@@ -50,6 +50,7 @@ export class PackagingInteractor {
 
   /** High-level use case that will orchestrate both algorithms. */
   public packageEverything(request: PackagingRequest): PackagingResponse {
+    void request;
     return {
       itemSummaries: [],
       boxSummaries: [],
