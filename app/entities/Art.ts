@@ -4,9 +4,15 @@ export interface Dimensions {
   height: number;
 }
 
+export enum ArtType {
+  Painting = "PAINTING",
+  Canvas = "CANVAS",
+  TactilePanel = "TACTILE_PANEL",
+}
+
 export class Art {
-  public getProductType(): string {
-    return ""; // enum ArtType { Painting, Canvas, TactilePanel }
+  public getProductType(): ArtType {
+    return ArtType.Painting;
   }
 
   public getDimensions(): Dimensions {
