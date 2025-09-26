@@ -1,0 +1,46 @@
+{
+  "workOrder": "WO-EXAMPLE-001",
+  "clientName": "Example Client",
+  "jobSiteLocation": "Example Location, MO",
+  "deliveryCapabilities": {
+    "acceptsPallets": true,
+    "acceptsCrates": true,
+    "loadingDockAccess": true,
+    "liftgateRequired": false,
+    "insideDeliveryNeeded": false
+  },
+  "serviceType": "Delivery + Installation",
+  "items": [
+    {
+      "lineNumber": 1,
+      "quantity": 1,
+      "tagNumber": 1,
+      "finalMedium": "Paper Print - Framed",
+      "outsideSizeWidth": 43,
+      "outsideSizeHeight": 33,
+      "glazing": "Regular Glass",
+      "frame1Moulding": "26930-BX",
+      "hardware": "3 pt Sec"
+    },
+    {
+      "lineNumber": 2,
+      "quantity": 2,
+      "tagNumber": 2,
+      "finalMedium": "Canvas - Float Frame",
+      "outsideSizeWidth": 27,
+      "outsideSizeHeight": 27,
+      "frame1Moulding": "313-301-BX",
+      "hardware": "3 pt Sec"
+    },
+    {
+      "lineNumber": 3,
+      "quantity": 1,
+      "tagNumber": 3,
+      "finalMedium": "Mirror",
+      "outsideSizeWidth": 36.125,
+      "outsideSizeHeight": 48.125,
+      "frame1Moulding": "80785-BX",
+      "hardware": "4 pt Sec"
+    }
+  ]
+}

@@ -1,13 +1,21 @@
-import { MaterialType } from "./PackInputDTO";
 
+/**
+ * Output DTO for packing calculation results
+ * Matches the required output format from project specifications
+ */
+import { MaterialType } from "./PackInputDTO";
 export interface PackOutputDTO {
+  // Project summary
   workOrder: string;
   clientName: string;
   totalPieces: number;
+  
+  // Weight summary
   weightSummary: {
-    totalArtworkWeight: number;
-    totalPackagingWeight: number;
-    finalShipmentWeight: number;
+    totalArtworkWeight: number; // lbs
+    totalPackagingWeight: number; // lbs
+    finalShipmentWeight: number; // lbs
+    
     weightBreakdown: {
       glassFramedPrints?: number;
       oversizedPieces?: number;
@@ -15,6 +23,7 @@ export interface PackOutputDTO {
       crates?: number;
     };
   };
+  
   packingSummary: {
     boxRequirements: {
       standardBoxes: number;
@@ -56,6 +65,7 @@ export interface PackOutputDTO {
     alternativeRecommendations: string[];
     riskFlags: string[];
   };
+
   freightCarrierExport: {
     subject: string;
     shipmentDetails: {
@@ -67,11 +77,15 @@ export interface PackOutputDTO {
       specialRequirements: string[];
     };
   };
+  
+  // Cost information
   cost: {
     estimatedCost: number;
     costBreakdown: CostBreakdown;
-    variance?: number;
+    variance?: number; // vs actual if available
   };
+  
+  // Detailed packing results
   items: PackedItem[];
   boxes: PackedBox[];
   containers: PackedContainer[];
@@ -87,7 +101,9 @@ export interface PackedItem {
     height: number;
   };
   weight: number;
+
   materialType: MaterialType;
+
   isOversized: boolean;
   requiresLargeBox: boolean;
   glazing?: string;
@@ -102,6 +118,9 @@ export interface PackedBox {
     width: number;
     height: number;
   };
+
+  // items: PackedItem[];
+
   items: Array<{
     lineNumber: number;
     tagNumber: number;
@@ -114,6 +133,7 @@ export interface PackedBox {
     glazing?: string;
     hardware?: string;
   }>;
+
   totalWeight: number;
   piecesCount: number;
 }
@@ -129,6 +149,33 @@ export interface PackedContainer {
   weight: number;
   boxes: PackedBox[];
   totalWeight: number;
+}
+
+
+export interface HardwareSummary {
+  lineItemHardware: Array<{
+    hardwareType: string;
+    quantity: number;
+  }>;
+  wallHardwareNeeded: {
+    drywallAnchors: number;
+    screws: number;
+    tBolts: number;
+  };
+}
+
+export interface OversizedItem {
+  dimensions: string;
+  quantity: number;
+  weight: number;
+  requiresLargeBox: boolean;
+}
+
+export interface SpecialMedium {
+  finalMedium: string;
+  quantity: number;
+  url?: string; // for Wall Decor items
+  isHighValue: boolean; // for Commissions
 }
 
 export interface CostBreakdown {
