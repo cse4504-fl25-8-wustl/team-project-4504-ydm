@@ -5,6 +5,19 @@ import { PackagingInteractor } from "../app/interactors/PackagingInteractor";
 import type { PackagingRequest } from "../app/requests/PackagingRequest";
 
 /**
+ * Entry point for the command-line workflow. Implementers must:
+ * 1. Read the CSV file path and site metadata flags from argv (already parsed below).
+ * 2. Delegate CSV parsing to app/parser/CsvParser.parse without duplicating parsing logic here.
+ * 3. Translate parsed rows into real Art entities once the parser supplies full data.
+ * 4. Construct a PackagingRequest that mirrors the schema in app/requests.
+ * 5. Invoke PackagingInteractor.packageEverything and print the PackagingResponse as JSON.
+ *    The current JSON.stringify call is the required output format.
+ * 6. Surface user-facing errors (bad arguments, missing files, parse failures) via stderr
+ *    and exit with a non-zero status. The success path must exit with code 0.
+ * Extending arguments (e.g., accepting defaults from config) should happen above the
+ * PackagingRequest construction while keeping the rest of the flow intact.
+ */
+/**
  * Normalizes human-friendly boolean strings (yes/no, true/false, etc.) into actual booleans.
  */
 function parseBoolean(value: string, label: string): boolean {

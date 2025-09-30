@@ -1,5 +1,14 @@
 import { Art } from "./Art";
 
+/**
+ * Box encapsulates capacity tracking for a single shipping box. Implementers must:
+ * - Store added Art items and enforce product-type limits (rule A) before accepting them.
+ * - Reject art whose dimensions exceed standard box limits (rule B) and flag special handling (rule C).
+ * - Provide isAtCapacity and getRemainingCapacity so interactors know whether to create new boxes.
+ * - Aggregate total weight by summing contained Art weights for crate-level calculations.
+ * The dummy return values below should be replaced with real rule checks; interactor tests will
+ * confirm the box either accepts or rejects an Art instance based on these rules.
+ */
 export class Box {
   private readonly contents: Art[] = [];
 

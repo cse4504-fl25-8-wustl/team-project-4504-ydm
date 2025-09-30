@@ -9,7 +9,11 @@ export interface DeliveryCapabilities {
 }
 
 /**
- * DTO describing the inputs required to run the packageEverything use case.
+ * PackagingRequest captures the normalized input for the packageEverything use case.
+ * Implementers updating this interface should keep it in sync with cli/main.ts argument
+ * parsing and ensure all fields are populated by the CSV parser or CLI defaults. If additional
+ * validation helpers are required (e.g., ensuring mutually exclusive flags), they should live
+ * alongside this type definition or inside the CLI layer.
  */
 export interface PackagingRequest {
   /** Full set of art objects that must be packed. */

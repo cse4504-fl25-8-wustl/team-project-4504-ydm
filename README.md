@@ -2,7 +2,11 @@
 team-project-4504-ydm was created by GitHub Classroom.
 
 ## Developer Guide
-- Requires Node.js 20+, pnpm, and the workspace devDependencies (install via `pnpm install`).
+- Requires Node.js 20+, pnpm, and the workspace devDependencies. Install prerequisites:
+  ```bash
+  npm install -g pnpm
+  pnpm install
+  ```
 - Run the packaging workflow:
   ```bash
   pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery>
@@ -12,10 +16,23 @@ team-project-4504-ydm was created by GitHub Classroom.
   ```bash
   pnpm package sample.csv "MedStar" "Chevy Chase, MD" "Delivery + Installation" yes yes no yes yes
   ```
-- Start the Next.js scaffold for UI exploration:
-  ```bash
-  pnpm dev
-  ```
+
+## Module Ownership Checklist
+- **Input & Parsing Pipeline** (`cli/`, `app/parser/`, `app/requests/`)
+  - Owner: *TBD*
+  - Handle CLI argument validation, error reporting, and request assembly.
+  - Implement CSV parsing and map rows into intermediate data structures.
+  - Coordinate conversion from parsed data into `Art` entities.
+- **Domain Entities & Business Rules** (`app/entities/`)
+  - Owner: *TBD*
+  - Model `Art`, `Box`, `Crate` state and invariants.
+  - Enforce capacity, dimension, and special handling rules.
+  - Provide weight/volume calculations consumed by interactors.
+- **Use Case Orchestration & Responses** (`app/interactors/`, `app/responses/`)
+  - Owner: *TBD*
+  - Implement box/crate packing algorithms and manage fallback paths.
+  - Aggregate entity data into `PackagingResponse` DTOs.
+  - Maintain response schema evolution as reporting needs change.
 
 ## Workflow Overview
 1. The CLI (`cli/main.ts`) parses command-line input, normalizes boolean flags, and invokes the CSV parser.
