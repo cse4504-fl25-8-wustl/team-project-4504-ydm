@@ -24,7 +24,7 @@ team-project-4504-ydm was created by GitHub Classroom.
   - Implement CSV parsing and map rows into intermediate data structures.
   - Coordinate conversion from parsed data into `Art` entities.
 - **Domain Entities & Business Rules** (`app/entities/`)
-  - Owner: *TBD*
+  - Owner: Yisu Wang
   - Model `Art`, `Box`, `Crate` state and invariants.
   - Enforce capacity, dimension, and special handling rules.
   - Provide weight/volume calculations consumed by interactors.
