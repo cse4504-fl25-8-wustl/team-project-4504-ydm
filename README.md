@@ -29,7 +29,7 @@ team-project-4504-ydm was created by GitHub Classroom.
   - Enforce capacity, dimension, and special handling rules.
   - Provide weight/volume calculations consumed by interactors.
 - **Use Case Orchestration & Responses** (`app/interactors/`, `app/responses/`)
-  - Owner: *TBD*
+  - Owner: Martin Rivera
   - Implement box/crate packing algorithms and manage fallback paths.
   - Aggregate entity data into `PackagingResponse` DTOs.
   - Maintain response schema evolution as reporting needs change.
