@@ -13,26 +13,20 @@ export interface Dimensions {
 }
 
 export enum ArtType {
-  FramedPrint = "FRAMED_PRINT",
-  Canvas = "CANVAS",
+  PaperPrint = "PAPER_PRINT",
+  PaperPrintWithTitlePlate = "PAPER_PRINT_WITH_TITLE_PLATE",
+  CanvasFloatFrame = "CANVAS_FLOAT_FRAME",
+  WallDecor = "WALL_DECOR",
   AcousticPanel = "ACOUSTIC_PANEL",
   AcousticPanelFramed = "ACOUSTIC_PANEL_FRAMED",
+  MetalPrint = "METAL_PRINT",
   Mirror = "MIRROR",
-  WallDecor = "WALL_DECOR",
-  PatientBoard = "PATIENT_BOARD",
-  Other = "OTHER",
 }
 
 export enum ArtMaterial {
   Glass = "GLASS",
   Acrylic = "ACRYLIC",
-  CanvasFramed = "CANVAS_FRAMED",
-  CanvasGallery = "CANVAS_GALLERY",
-  Mirror = "MIRROR",
-  AcousticPanel = "ACOUSTIC_PANEL",
-  AcousticPanelFramed = "ACOUSTIC_PANEL_FRAMED",
-  PatientBoard = "PATIENT_BOARD",
-  Unknown = "UNKNOWN",
+  NoGlazing = "NO_GLAZING",
 }
 
 export enum SpecialHandlingFlag {
@@ -54,13 +48,7 @@ export interface ArtCreationOptions {
 const MATERIAL_WEIGHT_LB_PER_SQIN: Record<ArtMaterial, number> = {
   [ArtMaterial.Glass]: 0.0098,
   [ArtMaterial.Acrylic]: 0.0094,
-  [ArtMaterial.CanvasFramed]: 0.0085,
-  [ArtMaterial.CanvasGallery]: 0.0061,
-  [ArtMaterial.Mirror]: 0.0191,
-  [ArtMaterial.AcousticPanel]: 0.0038,
-  [ArtMaterial.AcousticPanelFramed]: 0.0037,
-  [ArtMaterial.PatientBoard]: 0.0347,
-  [ArtMaterial.Unknown]: 0.0,
+  [ArtMaterial.NoGlazing]: 0.0,
 };
 
 const DEFAULT_DEPTH_PADDING_INCHES = 4;
@@ -82,6 +70,40 @@ export class Art {
   private readonly quantity: number;
   private readonly flags: Set<SpecialHandlingFlag>;
   private readonly description?: string;
+
+  public static fromCsvRow(row: Record<string, string>): Art {
+    const productType = row.productType as ArtType;
+    const material = row.glazingType as ArtMaterial;
+    
+    // Convert dimensions to numbers
+    const length = Number(row.length);
+    const width = Number(row.width);
+    const height = row.height ? Number(row.height) : undefined;
+    
+    if (isNaN(length) || isNaN(width) || (height !== undefined && isNaN(height))) {
+      throw new Error('Invalid dimensions: length, width, and height must be numbers');
+    }
+
+    // Parse special handling flags
+    const specialHandlingFlags: SpecialHandlingFlag[] = [];
+    if (parseBoolean(row.specialHandling || 'false')) {
+      specialHandlingFlags.push(SpecialHandlingFlag.ManualReview);
+    }
+
+    return new Art({
+      id: row.sku,
+      productType,
+      material,
+      dimensions: {
+        length,
+        width,
+        height
+      },
+      quantity: 1,
+      specialHandlingFlags,
+      description: row.description
+    });
+  }
 
   constructor(options: ArtCreationOptions) {
     this.id = options.id;
@@ -144,7 +166,7 @@ export class Art {
       this.productType === ArtType.Mirror ||
       this.productType === ArtType.WallDecor ||
       this.productType === ArtType.AcousticPanelFramed ||
-      this.productType === ArtType.PatientBoard
+      this.material === ArtMaterial.Glass
     );
   }
 
@@ -154,18 +176,12 @@ export class Art {
 
   public isOversized(): boolean {
     const dimensions = this.getDimensions();
-    if (dimensions.length > 44 || dimensions.width > 44) {
-      return true;
-    }
-    if (dimensions.length > 36 || dimensions.width > 36) {
-      return true;
-    }
-    return dimensions.length >= 36.5 && dimensions.width >= 36.5;
+    return dimensions.length > 36 && dimensions.width > 36;
   }
 
   public needsCustomPackaging(): boolean {
     const dimensions = this.getDimensions();
-    return dimensions.length > 44 || dimensions.width > 44;
+    return dimensions.length > 43.5 && dimensions.width > 43.5;
   }
 
   public getLargestDimension(): number {

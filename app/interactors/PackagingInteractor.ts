@@ -1,4 +1,4 @@
-import { Art, ArtType, GlazingType } from "../entities/Art";
+import { Art, ArtType, ArtMaterial } from "../entities/Art";
 import { Box } from "../entities/Box";
 import { Crate } from "../entities/Crate";
 import { PackagingRequest } from "../requests/PackagingRequest";
@@ -322,7 +322,7 @@ export class PackagingInteractor {
   private checkForFragileItems(artItems: Art[]): boolean {
     return artItems.some(art => 
       art.requiresSpecialHandling() || 
-      art.getGlazingType() === GlazingType.Glass ||
+      art.getMaterial() === ArtMaterial.Glass ||
       art.getProductType() === ArtType.Mirror
     );
   }
@@ -336,7 +336,7 @@ export class PackagingInteractor {
   }
 
   private checkForGlassItems(artItems: Art[]): boolean {
-    return artItems.some(art => art.getGlazingType() === GlazingType.Glass);
+    return artItems.some(art => art.getMaterial() === ArtMaterial.Glass);
   }
 
   private checkForAcousticPanels(artItems: Art[]): boolean {
@@ -347,14 +347,14 @@ export class PackagingInteractor {
   }
 
   private checkForCanvasItems(artItems: Art[]): boolean {
-    return artItems.some(art => art.getProductType() === ArtType.CanvasFloatFrame);
+    return artItems.some(art => 
+      art.getMaterial() === ArtMaterial.CanvasFramed ||
+      art.getMaterial() === ArtMaterial.CanvasGallery
+    );
   }
 
   private checkForPaperPrints(artItems: Art[]): boolean {
-    return artItems.some(art => 
-      art.getProductType() === ArtType.PaperPrint ||
-      art.getProductType() === ArtType.PaperPrintWithTitlePlate
-    );
+    return artItems.some(art => art.getProductType() === ArtType.FramedPrint);
   }
 
   private determineAlgorithmUsed(

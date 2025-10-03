@@ -1,0 +1,11 @@
+sku,productType,glazingType,length,width,height,weight,description,specialHandling
+ART001,PAPER_PRINT,GLASS,24,18,2,15,Standard Paper Print,false
+ART002,CANVAS_FLOAT_FRAME,NO_GLAZING,36,24,1.5,8,Large Canvas Print,false
+ART003,MIRROR,GLASS,48,36,3,45,Oversized Mirror,true
+ART004,ACOUSTIC_PANEL,NO_GLAZING,30,20,2,12,Sound Dampening Panel,false
+ART005,PAPER_PRINT_WITH_TITLE_PLATE,ACRYLIC,12,12,1,5,Small Print with Title,false
+ART006,WALL_DECOR,NO_GLAZING,40,30,4,25,Large Wall Decor,true
+ART007,METAL_PRINT,NO_GLAZING,24,36,1,20,Metal Print,true
+ART008,ACOUSTIC_PANEL_FRAMED,NO_GLAZING,20,20,3,15,Framed Acoustic Panel,true
+ART009,CANVAS_FLOAT_FRAME,NO_GLAZING,15,15,1.5,6,Small Canvas Print,false
+ART010,PAPER_PRINT,GLASS,44,44,2,40,Maximum Size Print,true

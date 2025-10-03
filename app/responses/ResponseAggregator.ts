@@ -1,4 +1,4 @@
-import { Art, ArtType, GlazingType } from "../entities/Art";
+import { Art, ArtType, ArtMaterial } from "../entities/Art";
 import { Box } from "../entities/Box";
 import { Crate } from "../entities/Crate";
 import { 
@@ -199,7 +199,7 @@ export class ResponseAggregator {
     
     if (specialHandlingItems.length > 0) {
       const mirrorCount = specialHandlingItems.filter(art => art.getProductType() === ArtType.Mirror).length;
-      const glassCount = specialHandlingItems.filter(art => art.getGlazingType() === GlazingType.Glass).length;
+      const glassCount = specialHandlingItems.filter(art => art.getMaterial() === ArtMaterial.Glass).length;
       const acousticCount = specialHandlingItems.filter(art => 
         art.getProductType() === ArtType.AcousticPanel || 
         art.getProductType() === ArtType.AcousticPanelFramed
@@ -295,11 +295,11 @@ export class ResponseAggregator {
   private getProductTypeString(productType: ArtType): string {
     switch (productType) {
       case ArtType.PaperPrint:
-        return "Paper Print - Framed";
+        return "Paper Print";
       case ArtType.PaperPrintWithTitlePlate:
-        return "Print - Framed with Title Plate";
+        return "Paper Print with Title Plate";
       case ArtType.CanvasFloatFrame:
-        return "Canvas - Float Frame";
+        return "Canvas Float Frame";
       case ArtType.WallDecor:
         return "Wall Décor";
       case ArtType.AcousticPanel:
@@ -317,7 +317,7 @@ export class ResponseAggregator {
 
   private requiresSpecialHandling(art: Art): boolean {
     return art.requiresSpecialHandling() ||
-           art.getGlazingType() === GlazingType.Glass ||
+           art.getMaterial() === ArtMaterial.Glass ||
            art.getProductType() === ArtType.Mirror ||
            art.getProductType() === ArtType.AcousticPanel ||
            art.getProductType() === ArtType.AcousticPanelFramed;

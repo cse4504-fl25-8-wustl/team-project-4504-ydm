@@ -1,5 +1,5 @@
-import { Art, ArtType, GlazingType } from "../entities/Art";
-import { Box } from "../entities/Box";
+import { Art, ArtType, ArtMaterial } from "../entities/Art";
+import { Box, BoxType } from "../entities/Box";
 import { Crate } from "../entities/Crate";
 
 /**
@@ -37,6 +37,13 @@ export interface CratePackingResult {
   totalWeight: number;
 }
 
+function isFragileItem(art: Art): boolean {
+  const productType = art.getProductType();
+  return productType === ArtType.Mirror || 
+         productType === ArtType.PaperPrint || 
+         art.getMaterial() === ArtMaterial.Glass;
+}
+
 /**
  * First-fit decreasing algorithm for box packing.
  * Sorts items by size (largest first) and places each in the first box that can accommodate it.
@@ -49,8 +56,8 @@ export class FirstFitDecreasingBoxPacking implements BoxPackingStrategy {
     // Sort art items by largest dimension (descending) for better packing efficiency
     // Prioritize fragile items (mirrors, glass) to be packed first for better protection
     const sortedArt = [...artItems].sort((a, b) => {
-      const aFragile = this.isFragileItem(a);
-      const bFragile = this.isFragileItem(b);
+      const aFragile = isFragileItem(a);
+      const bFragile = isFragileItem(b);
       
       // Fragile items first
       if (aFragile && !bFragile) return -1;
@@ -73,12 +80,22 @@ export class FirstFitDecreasingBoxPacking implements BoxPackingStrategy {
         }
       }
 
-      // If not placed, create a new box
+      // If not placed, try creating a new box
       if (!placed) {
-        const newBox = new Box();
-        if (newBox.canAccommodate(art)) {
-          if (newBox.addArt(art)) {
-            boxes.push(newBox);
+        // Try large box first for oversized items
+        if (art.isOversized()) {
+          const largeBox = new Box({ type: BoxType.Large });
+          if (largeBox.canAccommodate(art) && largeBox.addArt(art)) {
+            boxes.push(largeBox);
+            placed = true;
+          }
+        }
+
+        // If still not placed, try standard box
+        if (!placed) {
+          const standardBox = new Box({ type: BoxType.Standard });
+          if (standardBox.canAccommodate(art) && standardBox.addArt(art)) {
+            boxes.push(standardBox);
             placed = true;
           }
         }
@@ -121,8 +138,8 @@ export class BestFitBoxPacking implements BoxPackingStrategy {
     // Sort art items by weight (heaviest first) for stability
     // Also consider fragile items for special handling
     const sortedArt = [...artItems].sort((a, b) => {
-      const aFragile = this.isFragileItem(a);
-      const bFragile = this.isFragileItem(b);
+      const aFragile = isFragileItem(a);
+      const bFragile = isFragileItem(b);
       
       // Fragile items get priority placement
       if (aFragile && !bFragile) return -1;
@@ -151,11 +168,22 @@ export class BestFitBoxPacking implements BoxPackingStrategy {
       if (bestBox && bestBox.addArt(art)) {
         placed = true;
       } else {
-        // Create new box if no suitable box found
-        const newBox = new Box();
-        if (newBox.canAccommodate(art) && newBox.addArt(art)) {
-          boxes.push(newBox);
-          placed = true;
+        // Try large box first for oversized items
+        if (art.isOversized()) {
+          const largeBox = new Box({ type: BoxType.Large });
+          if (largeBox.canAccommodate(art) && largeBox.addArt(art)) {
+            boxes.push(largeBox);
+            placed = true;
+          }
+        }
+
+        // If still not placed, try standard box
+        if (!placed) {
+          const standardBox = new Box({ type: BoxType.Standard });
+          if (standardBox.canAccommodate(art) && standardBox.addArt(art)) {
+            boxes.push(standardBox);
+            placed = true;
+          }
         }
       }
 
@@ -175,12 +203,25 @@ export class BestFitBoxPacking implements BoxPackingStrategy {
     };
   }
 
+  private calculatePackingEfficiency(boxes: Box[], totalItems: number): number {
+    if (totalItems === 0) return 1.0;
+    
+    const packedItems = boxes.reduce((sum, box) => sum + box.getContents().length, 0);
+    return packedItems / totalItems;
+  }
+}
+
+/**
+ * First-fit algorithm for crate packing.
+ * Places each box in the first crate that can accommodate it.
+ */
+export class FirstFitCratePacking implements CratePackingStrategy {
   pack(boxes: Box[], availableCrates: Crate[] = []): CratePackingResult {
     const crates = [...availableCrates];
     const unassignedBoxes: Box[] = [];
 
     // Sort boxes by weight (heaviest first) for better stability
-    const sortedBoxes = [...boxes].sort((a, b) => b.getTotalWeight() - a.getTotalWeight());
+    const sortedBoxes = [...boxes];
 
     for (const box of sortedBoxes) {
       let placed = false;
