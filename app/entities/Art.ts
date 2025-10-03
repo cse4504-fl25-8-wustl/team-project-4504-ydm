@@ -21,12 +21,20 @@ export enum ArtType {
   AcousticPanelFramed = "ACOUSTIC_PANEL_FRAMED",
   MetalPrint = "METAL_PRINT",
   Mirror = "MIRROR",
+  PatientBoard = "PATIENT_BOARD",
 }
 
 export enum ArtMaterial {
   Glass = "GLASS",
   Acrylic = "ACRYLIC",
+  CanvasFramed = "CANVAS_FRAMED",
+  CanvasGallery = "CANVAS_GALLERY",
+  Mirror = "MIRROR",
+  AcousticPanel = "ACOUSTIC_PANEL",
+  AcousticPanelFramed = "ACOUSTIC_PANEL_FRAMED",
+  PatientBoard = "PATIENT_BOARD",
   NoGlazing = "NO_GLAZING",
+  Unknown = "UNKNOWN",
 }
 
 export enum SpecialHandlingFlag {
@@ -43,12 +51,23 @@ export interface ArtCreationOptions {
   quantity?: number;
   specialHandlingFlags?: SpecialHandlingFlag[];
   description?: string;
+  finalMediumLabel?: string;
+  glazingLabel?: string;
+  hardwareLabel?: string;
+  hardwarePiecesPerItem?: number;
 }
 
 const MATERIAL_WEIGHT_LB_PER_SQIN: Record<ArtMaterial, number> = {
   [ArtMaterial.Glass]: 0.0098,
   [ArtMaterial.Acrylic]: 0.0094,
+  [ArtMaterial.CanvasFramed]: 0.0085,
+  [ArtMaterial.CanvasGallery]: 0.0061,
+  [ArtMaterial.Mirror]: 0.0191,
+  [ArtMaterial.AcousticPanel]: 0.0038,
+  [ArtMaterial.AcousticPanelFramed]: 0.0037,
+  [ArtMaterial.PatientBoard]: 0.0347,
   [ArtMaterial.NoGlazing]: 0.0,
+  [ArtMaterial.Unknown]: 0.0,
 };
 
 const DEFAULT_DEPTH_PADDING_INCHES = 4;
@@ -58,6 +77,14 @@ const DEFAULT_DEPTH_PADDING_INCHES = 4;
  */
 function roundUp(value: number): number {
   return Math.ceil(value);
+}
+
+function normalizeLabel(value: string | undefined): string {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 export class Art {
@@ -70,38 +97,75 @@ export class Art {
   private readonly quantity: number;
   private readonly flags: Set<SpecialHandlingFlag>;
   private readonly description?: string;
+  private readonly finalMediumLabel?: string;
+  private readonly glazingLabel?: string;
+  private readonly hardwareLabel?: string;
+  private readonly hardwarePiecesPerItem?: number;
+
+  private static readonly FINAL_MEDIUM_MAP: Record<string, { type: ArtType; material: ArtMaterial; defaultFlags?: SpecialHandlingFlag[]; }> = {
+    "paper print - framed": { type: ArtType.PaperPrint, material: ArtMaterial.Glass },
+    "print - framed with title plate": { type: ArtType.PaperPrintWithTitlePlate, material: ArtMaterial.Glass },
+    "canvas - float frame": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasFramed },
+    "canvas - gallery": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasGallery },
+    "wall decor": { type: ArtType.WallDecor, material: ArtMaterial.Unknown },
+    "wall décor": { type: ArtType.WallDecor, material: ArtMaterial.Unknown },
+    "metal print": { type: ArtType.MetalPrint, material: ArtMaterial.Acrylic },
+    "mirror": { type: ArtType.Mirror, material: ArtMaterial.Mirror },
+    "acoustic panel": { type: ArtType.AcousticPanel, material: ArtMaterial.AcousticPanel },
+    "acoustic panel - framed": { type: ArtType.AcousticPanelFramed, material: ArtMaterial.AcousticPanelFramed },
+    "patient board": { type: ArtType.PatientBoard, material: ArtMaterial.PatientBoard },
+  };
+
+  private static readonly GLAZING_MAP: Record<string, ArtMaterial> = {
+    "regular glass": ArtMaterial.Glass,
+    glass: ArtMaterial.Glass,
+    acrylic: ArtMaterial.Acrylic,
+  };
 
   public static fromCsvRow(row: Record<string, string>): Art {
-    const productType = row.productType as ArtType;
-    const material = row.glazingType as ArtMaterial;
-    
-    // Convert dimensions to numbers
-    const length = Number(row.length);
-    const width = Number(row.width);
-    const height = row.height ? Number(row.height) : undefined;
-    
-    if (isNaN(length) || isNaN(width) || (height !== undefined && isNaN(height))) {
-      throw new Error('Invalid dimensions: length, width, and height must be numbers');
+    const mediumKey = normalizeLabel(row.finalMedium);
+    const mediumInfo = Art.FINAL_MEDIUM_MAP[mediumKey];
+    if (!mediumInfo) {
+      throw new Error(`Unknown final medium '${row.finalMedium ?? ""}'`);
     }
 
-    // Parse special handling flags
-    const specialHandlingFlags: SpecialHandlingFlag[] = [];
-    if (parseBoolean(row.specialHandling || 'false')) {
-      specialHandlingFlags.push(SpecialHandlingFlag.ManualReview);
+    const glazingKey = normalizeLabel(row.glazing);
+    const glazingMaterial = glazingKey ? Art.GLAZING_MAP[glazingKey] : undefined;
+    const material = glazingMaterial ?? mediumInfo.material;
+
+    const rawWidth = Number(row.outsideWidth ?? row.width);
+    const rawHeight = Number(row.outsideHeight ?? row.length);
+
+    if (!Number.isFinite(rawWidth) || !Number.isFinite(rawHeight)) {
+      throw new Error(`Invalid dimensions for '${row.finalMedium ?? ""}'`);
     }
+
+    const quantity = Number(row.quantity ?? "1");
+    const finalQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+
+    const length = Math.max(rawWidth, rawHeight);
+    const width = Math.min(rawWidth, rawHeight);
+
+    const hardwareLabel = row.hardware?.trim();
+    const hardwarePiecesPerItem = Art.parseHardwarePieces(hardwareLabel);
+
+    const id = (row.tagNumber || row.lineNumber || row.finalMedium || Math.random().toString(36).slice(2)).toString();
 
     return new Art({
-      id: row.sku,
-      productType,
+      id,
+      productType: mediumInfo.type,
       material,
       dimensions: {
         length,
         width,
-        height
       },
-      quantity: 1,
-      specialHandlingFlags,
-      description: row.description
+      quantity: finalQuantity,
+      specialHandlingFlags: mediumInfo.defaultFlags,
+      description: row.finalMedium,
+      finalMediumLabel: row.finalMedium,
+      glazingLabel: row.glazing,
+      hardwareLabel,
+      hardwarePiecesPerItem,
     });
   }
 
@@ -116,9 +180,17 @@ export class Art {
     this.quantity = options.quantity ?? 1;
     this.flags = new Set(options.specialHandlingFlags ?? []);
     this.description = options.description;
+    this.finalMediumLabel = options.finalMediumLabel;
+    this.glazingLabel = options.glazingLabel;
+    this.hardwareLabel = options.hardwareLabel;
+    this.hardwarePiecesPerItem = options.hardwarePiecesPerItem;
   }
 
   public getId(): string {
+    return this.id;
+  }
+
+  public getSku(): string {
     return this.id;
   }
 
@@ -136,6 +208,27 @@ export class Art {
 
   public getQuantity(): number {
     return this.quantity;
+  }
+
+  public getFinalMediumLabel(): string | undefined {
+    return this.finalMediumLabel;
+  }
+
+  public getGlazingLabel(): string | undefined {
+    return this.glazingLabel;
+  }
+
+  public getHardwareLabel(): string | undefined {
+    return this.hardwareLabel;
+  }
+
+  public getHardwarePiecesPerItem(): number | undefined {
+    return this.hardwarePiecesPerItem;
+  }
+
+  public getHardwarePiecesTotal(): number {
+    const piecesPerItem = this.hardwarePiecesPerItem ?? 0;
+    return piecesPerItem * this.quantity;
   }
 
   public getDimensions(): { length: number; width: number; height: number } {
@@ -174,14 +267,23 @@ export class Art {
     return this.productType === ArtType.Mirror;
   }
 
+  public requiresOversizeBox(): boolean {
+    const footprint = this.getPlanarFootprint();
+    return (
+      footprint.longSide > 36 &&
+      footprint.shortSide > 36 &&
+      footprint.longSide <= 43.5 &&
+      footprint.shortSide <= 43.5
+    );
+  }
+
   public isOversized(): boolean {
-    const dimensions = this.getDimensions();
-    return dimensions.length > 36 && dimensions.width > 36;
+    return this.requiresOversizeBox();
   }
 
   public needsCustomPackaging(): boolean {
-    const dimensions = this.getDimensions();
-    return dimensions.length > 43.5 && dimensions.width > 43.5;
+    const footprint = this.getPlanarFootprint();
+    return footprint.longSide > 43.5 && footprint.shortSide > 43.5;
   }
 
   public getLargestDimension(): number {
@@ -201,12 +303,18 @@ export class Art {
   public getSpecialHandlingFlags(): SpecialHandlingFlag[] {
     return Array.from(this.flags);
   }
-}
 
-/**
- * Helper function to parse boolean values from CSV strings
- */
-function parseBoolean(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  return ["y", "yes", "true", "1", "special"].includes(normalized);
+  private static parseHardwarePieces(label?: string): number | undefined {
+    if (!label) {
+      return undefined;
+    }
+
+    const match = label.trim().match(/^(\d+)/);
+    if (!match) {
+      return undefined;
+    }
+
+    const value = Number(match[1]);
+    return Number.isFinite(value) ? value : undefined;
+  }
 }

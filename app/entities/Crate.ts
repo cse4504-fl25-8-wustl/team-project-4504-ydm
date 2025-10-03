@@ -26,7 +26,7 @@ const CRATE_SPECIFICATIONS: Record<CrateType, CrateSpecification> = {
     type: CrateType.StandardCrate,
     containerKind: ContainerKind.Crate,
     tareWeight: 125,
-    // TODO: capture max box capacity for crate shipping once confirmed.
+    maxBoxes: 3,
     notes: "Most protective option; can also accept loose items per Bri's rules.",
   },
   [CrateType.StandardPallet]: {
@@ -127,5 +127,13 @@ export class Crate {
 
   public calculateWeight(overhead: number): number {
     return Math.ceil(this.totalWeight + overhead);
+  }
+
+  public getTotalWeight(): number {
+    return Math.ceil(this.totalWeight);
+  }
+
+  public getTareWeight(): number {
+    return this.spec.tareWeight;
   }
 }

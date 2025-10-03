@@ -19,11 +19,11 @@ interface BoxSpecification {
 const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
   [BoxType.Standard]: {
     type: BoxType.Standard,
-    innerLength: 37,
-    innerWidth: 31,
+    innerLength: 36,
+    innerWidth: 36,
     innerHeight: 11,
     tareWeight: 0, // TODO: confirm the actual tare weight for standard boxes.
-    notes: "Most common size; fits items up to 36 inches on the long edge.",
+    notes: "Most common size; telescope up to 84 inches on the long edge when one side ≤36 inches.",
   },
   [BoxType.Large]: {
     type: BoxType.Large,
@@ -90,6 +90,9 @@ export class Box {
   private oversizedPieces = 0;
   private totalWeight: number;
   private readonly nominalCapacity: number;
+  private requiredLength: number;
+  private requiredWidth: number;
+  private requiredHeight: number;
 
   constructor(options: BoxOptions = {}) {
     const type = options.type ?? BoxType.Standard;
@@ -120,6 +123,9 @@ export class Box {
     }
 
     this.totalWeight = this.spec.tareWeight;
+    this.requiredLength = this.spec.innerLength;
+    this.requiredWidth = this.spec.innerWidth;
+    this.requiredHeight = this.spec.innerHeight;
   }
 
   public getType(): BoxType {
@@ -200,6 +206,12 @@ export class Box {
     }
 
     this.totalWeight += art.getWeight();
+
+    const dims = art.getDimensions();
+    const footprint = art.getPlanarFootprint();
+    this.requiredLength = Math.max(this.requiredLength, footprint.longSide);
+    this.requiredWidth = Math.max(this.requiredWidth, footprint.shortSide);
+    this.requiredHeight = Math.max(this.requiredHeight, dims.height);
     return true;
   }
 
@@ -223,6 +235,26 @@ export class Box {
     return Math.ceil(this.totalWeight);
   }
 
+  public getNominalCapacity(): number {
+    return this.nominalCapacity;
+  }
+
+  public getRequiredDimensions(): { length: number; width: number; height: number } {
+    return {
+      length: this.requiredLength,
+      width: this.requiredWidth,
+      height: this.requiredHeight,
+    };
+  }
+
+  public getTelescopingLength(): number | null {
+    if (this.spec.type !== BoxType.Standard) {
+      return null;
+    }
+
+    return this.requiredLength > this.spec.innerLength ? this.requiredLength : null;
+  }
+
   public getFootprint(): { length: number; width: number; height: number } {
     return {
       length: this.spec.innerLength,
@@ -232,30 +264,52 @@ export class Box {
   }
 
   private fitsDimensions(art: Art): boolean {
-    const artFootprint = art.getPlanarFootprint();
-    const boxPlanar = [this.spec.innerLength, this.spec.innerWidth].sort((a, b) => b - a);
-    const artPlanar = [artFootprint.longSide, artFootprint.shortSide].sort((a, b) => b - a);
+    const footprint = art.getPlanarFootprint();
+    const depth = art.getDepth();
 
-    if (artPlanar[0] > boxPlanar[0]) {
-      return false;
+    switch (this.spec.type) {
+      case BoxType.Standard: {
+        if (footprint.shortSide > 36) {
+          return false;
+        }
+
+        if (footprint.longSide > 84) {
+          return false;
+        }
+
+        return depth <= this.spec.innerHeight;
+      }
+
+      case BoxType.Large: {
+        if (footprint.longSide > 43.5 || footprint.shortSide > 43.5) {
+          return false;
+        }
+
+        return depth <= this.spec.innerHeight;
+      }
+
+      case BoxType.UpsSmall:
+      case BoxType.UpsLarge: {
+        const boxPlanar = [this.spec.innerLength, this.spec.innerWidth].sort((a, b) => b - a);
+        const artPlanar = [footprint.longSide, footprint.shortSide].sort((a, b) => b - a);
+
+        if (artPlanar[0] > boxPlanar[0]) {
+          return false;
+        }
+
+        if (artPlanar[1] > boxPlanar[1]) {
+          return false;
+        }
+
+        if (depth > this.spec.innerHeight) {
+          return false;
+        }
+
+        return true;
+      }
+
+      default:
+        return true;
     }
-
-    if (artPlanar[1] > boxPlanar[1]) {
-      return false;
-    }
-
-    if (art.getDepth() > this.spec.innerHeight) {
-      return false;
-    }
-
-    if (this.spec.type === BoxType.Standard && art.isOversized()) {
-      return false;
-    }
-
-    if (this.spec.type === BoxType.UpsSmall || this.spec.type === BoxType.UpsLarge) {
-      // TODO: enforce parcel service product restrictions once business confirms mappings.
-    }
-
-    return true;
   }
 }

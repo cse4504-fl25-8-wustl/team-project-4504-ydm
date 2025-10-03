@@ -1,11 +1,8 @@
-sku,productType,glazingType,length,width,height,weight,description,specialHandling
-ART001,PAPER_PRINT,GLASS,24,18,2,15,Standard Paper Print,false
-ART002,CANVAS_FLOAT_FRAME,NO_GLAZING,36,24,1.5,8,Large Canvas Print,false
-ART003,MIRROR,GLASS,48,36,3,45,Oversized Mirror,true
-ART004,ACOUSTIC_PANEL,NO_GLAZING,30,20,2,12,Sound Dampening Panel,false
-ART005,PAPER_PRINT_WITH_TITLE_PLATE,ACRYLIC,12,12,1,5,Small Print with Title,false
-ART006,WALL_DECOR,NO_GLAZING,40,30,4,25,Large Wall Decor,true
-ART007,METAL_PRINT,NO_GLAZING,24,36,1,20,Metal Print,true
-ART008,ACOUSTIC_PANEL_FRAMED,NO_GLAZING,20,20,3,15,Framed Acoustic Panel,true
-ART009,CANVAS_FLOAT_FRAME,NO_GLAZING,15,15,1.5,6,Small Canvas Print,false
-ART010,PAPER_PRINT,GLASS,44,44,2,40,Maximum Size Print,true
+Line Number,Quantity,Tag #,Final Medium,Outside Size Width,Outside Size Height,Glazing,Frame 1 Moulding,Hardware
+1,1,1,Paper Print - Framed,31.3750,45.3750,Regular Glass,475130-BX,4 pt Sec
+2,1,2,Canvas - Float Frame,27.0000,27.0000,,313-301-BX,3 pt Sec
+3,1,3,Print - Framed with Title Plate,25.0000,49.0000,Regular Glass,26930-BX,4 pt Sec
+4,1,5,Wall Décor,32.0000,32.0000,,451237-A,3 pt Sec
+5,1,6,Metal Print,24.0000,36.0000,,698410-C,3 pt Sec
+6,1,8,Paper Print - Framed,42.5000,30.5000,Regular Glass,26930-BX,3 pt Sec
+7,1,7,Mirror,36.1250,48.1250,,80785-BX,4 pt Sec

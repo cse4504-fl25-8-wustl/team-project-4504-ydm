@@ -14,7 +14,7 @@ team-project-4504-ydm was created by GitHub Classroom.
   Boolean flags accept `yes/no`, `true/false`, `y/n`, or `1/0`.
 - Example invocation (all dummy data for now):
   ```bash
-  pnpm package sample.csv "MedStar" "Chevy Chase, MD" "Delivery + Installation" yes yes no yes yes
+  pnpm package test_art.csv "MedStar" "Chevy Chase, MD" "Delivery + Installation" yes yes no yes yes
   ```
 
 ## Module Ownership Checklist

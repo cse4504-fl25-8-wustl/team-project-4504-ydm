@@ -1,7 +1,31 @@
 import { readFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import csvParse from "csv-parser";
-import { Art, ArtMaterial, ArtType } from "../entities/Art";
+import { Art } from "../entities/Art";
+
+const HEADER_ALIASES: Record<string, string> = {
+  "line number": "lineNumber",
+  quantity: "quantity",
+  "tag #": "tagNumber",
+  "final medium": "finalMedium",
+  "outside size width": "outsideWidth",
+  "outside size height": "outsideHeight",
+  glazing: "glazing",
+  "frame 1 moulding": "frameMoulding",
+  hardware: "hardware",
+};
+
+const REQUIRED_COLUMNS = [
+  "lineNumber",
+  "quantity",
+  "tagNumber",
+  "finalMedium",
+  "outsideWidth",
+  "outsideHeight",
+  "glazing",
+  "frameMoulding",
+  "hardware",
+];
 
 
 export interface ParseResult {
@@ -66,17 +90,20 @@ export async function parseWithDiagnostics(csvFilePath: string): Promise<ParseRe
     
     stream
       .pipe(csvParse({
-        mapHeaders: ({ header }) => header.trim().replace(/"/g, ''), // Clean headers
+        mapHeaders: ({ header }) => {
+          const cleaned = header.trim().replace(/"/g, "");
+          const normalized = cleaned.toLowerCase();
+          return HEADER_ALIASES[normalized] ?? cleaned.replace(/[^a-zA-Z0-9]+/g, "");
+        },
       }))
       .on('data', (row: Record<string, string>) => {
         totalRows++;
         
         try {
           // Validate required columns exist - check for case variations
-          const requiredColumns = ['sku', 'productType', 'glazingType', 'length', 'width', 'height', 'weight'];
           const rowKeys = Object.keys(row);
-          const missingColumns = requiredColumns.filter(col => 
-            !rowKeys.some(key => key.toLowerCase() === col.toLowerCase())
+          const missingColumns = REQUIRED_COLUMNS.filter((col) =>
+            !rowKeys.includes(col)
           );
           
           if (missingColumns.length > 0) {
@@ -130,9 +157,14 @@ export async function validateCsvStructure(csvFilePath: string): Promise<{
     const firstLine = await readFile(csvFilePath, 'utf8').then(content => content.split('\n')[0]);
     headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
     
-    const requiredColumns = ['sku', 'productType', 'glazingType', 'length', 'width', 'height', 'weight'];
-    const missingColumns = requiredColumns.filter(col => 
-      !headers.some(h => h.toLowerCase() === col.toLowerCase())
+    const normalized = headers.map((h) => {
+      const cleaned = h.trim().replace(/"/g, "");
+      const lower = cleaned.toLowerCase();
+      return HEADER_ALIASES[lower] ?? cleaned.replace(/[^a-zA-Z0-9]+/g, "");
+    });
+
+    const missingColumns = REQUIRED_COLUMNS.filter((col) =>
+      !normalized.includes(col)
     );
     
     if (missingColumns.length > 0) {
