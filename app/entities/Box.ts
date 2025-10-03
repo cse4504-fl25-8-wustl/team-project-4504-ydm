@@ -1,43 +1,260 @@
-import { Art } from "./Art";
+import { Art, ArtType } from "./Art";
 
-/**
- * Box encapsulates capacity tracking for a single shipping box. Implementers must:
- * - Store added Art items and enforce product-type limits (rule A) before accepting them.
- * - Reject art whose dimensions exceed standard box limits (rule B) and flag special handling (rule C).
- * - Provide isAtCapacity and getRemainingCapacity so interactors know whether to create new boxes.
- * - Aggregate total weight by summing contained Art weights for crate-level calculations.
- * The dummy return values below should be replaced with real rule checks; interactor tests will
- * confirm the box either accepts or rejects an Art instance based on these rules.
- */
+export enum BoxType {
+  Standard = "STANDARD",
+  Large = "LARGE",
+  UpsSmall = "UPS_SMALL",
+  UpsLarge = "UPS_LARGE",
+}
+
+interface BoxSpecification {
+  type: BoxType;
+  innerLength: number;
+  innerWidth: number;
+  innerHeight: number;
+  tareWeight: number;
+  notes?: string;
+}
+
+const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
+  [BoxType.Standard]: {
+    type: BoxType.Standard,
+    innerLength: 37,
+    innerWidth: 31,
+    innerHeight: 11,
+    tareWeight: 0, // TODO: confirm the actual tare weight for standard boxes.
+    notes: "Most common size; fits items up to 36 inches on the long edge.",
+  },
+  [BoxType.Large]: {
+    type: BoxType.Large,
+    innerLength: 44,
+    innerWidth: 44,
+    innerHeight: 13,
+    tareWeight: 0, // TODO: capture the actual tare weight for large boxes.
+    notes: ">36 inches in both directions; intended for oversized pieces up to ~43.5 inches.",
+  },
+  [BoxType.UpsSmall]: {
+    type: BoxType.UpsSmall,
+    innerLength: 36,
+    innerWidth: 36,
+    innerHeight: 6,
+    tareWeight: 0,
+    notes: "UPS parcel only; not suitable for fragile glazing (rule 15).",
+  },
+  [BoxType.UpsLarge]: {
+    type: BoxType.UpsLarge,
+    innerLength: 44,
+    innerWidth: 35,
+    innerHeight: 6,
+    tareWeight: 0,
+    notes: "Adjustable-length UPS carton; keep for durable acrylic shipments (rule 15).",
+  },
+};
+
+const DEFAULT_CANVAS_PIECES_PER_BOX = 6; // TODO: validate vs written instruction that cites 4 pieces per box.
+
+interface BoxRules {
+  maxPiecesPerProduct: Partial<Record<ArtType, number>>;
+  maxOversizedPieces: number;
+  disallowedProductTypes: Set<ArtType>;
+}
+
+const DEFAULT_BOX_RULES: BoxRules = {
+  maxPiecesPerProduct: {
+    [ArtType.FramedPrint]: 6,
+    [ArtType.Canvas]: DEFAULT_CANVAS_PIECES_PER_BOX,
+    [ArtType.AcousticPanel]: 4,
+    [ArtType.AcousticPanelFramed]: 4,
+    [ArtType.Mirror]: 0, // Mirrors are crate-only per packing guidance.
+    [ArtType.WallDecor]: 6,
+    [ArtType.PatientBoard]: 6,
+  },
+  maxOversizedPieces: 3,
+  disallowedProductTypes: new Set([ArtType.Mirror]),
+};
+
+export interface BoxOptions {
+  type?: BoxType;
+  maxPiecesPerProductOverride?: Partial<Record<ArtType, number>>;
+  maxOversizedPiecesOverride?: number;
+  disallowedProductTypesOverride?: ArtType[];
+}
+
 export class Box {
+  private readonly spec: BoxSpecification;
+  private readonly rules: BoxRules;
   private readonly contents: Art[] = [];
+  private readonly counts = new Map<ArtType, number>();
+  private totalPieces = 0;
+  private oversizedPieces = 0;
+  private totalWeight: number;
+  private readonly nominalCapacity: number;
 
-  public canAccommodate(art: Art): boolean {
-    // Business rule A.i-A.ii: enforce product-specific capacity limits before accepting art.
-    // Business rule B: reject art pieces exceeding 44 inches that require custom packaging.
-    return false;
+  constructor(options: BoxOptions = {}) {
+    const type = options.type ?? BoxType.Standard;
+    this.spec = BOX_SPECIFICATIONS[type];
+
+    const mergedMaxPieces: Partial<Record<ArtType, number>> = {
+      ...DEFAULT_BOX_RULES.maxPiecesPerProduct,
+      ...options.maxPiecesPerProductOverride,
+    };
+
+    const disallowed = new Set(DEFAULT_BOX_RULES.disallowedProductTypes);
+    for (const override of options.disallowedProductTypesOverride ?? []) {
+      disallowed.add(override);
+    }
+
+    this.rules = {
+      maxPiecesPerProduct: mergedMaxPieces,
+      maxOversizedPieces: options.maxOversizedPiecesOverride ?? DEFAULT_BOX_RULES.maxOversizedPieces,
+      disallowedProductTypes: disallowed,
+    };
+
+    const finiteLimits = Object.values(mergedMaxPieces)
+      .filter((limit): limit is number => typeof limit === "number" && Number.isFinite(limit));
+    if (finiteLimits.length > 0) {
+      this.nominalCapacity = Math.max(this.rules.maxOversizedPieces, ...finiteLimits);
+    } else {
+      this.nominalCapacity = this.rules.maxOversizedPieces;
+    }
+
+    this.totalWeight = this.spec.tareWeight;
   }
 
-  public addArt(art: Art): boolean {
-    // Business rule C: flag tactile panels and raised float mounts for special handling.
-    this.contents.push(art);
-    return false;
+  public getType(): BoxType {
+    return this.spec.type;
+  }
+
+  public getSpecification(): BoxSpecification {
+    return this.spec;
   }
 
   public getContents(): Art[] {
     return [...this.contents];
   }
 
+  public getTotalPieces(): number {
+    return this.totalPieces;
+  }
+
+  public getOversizedPieces(): number {
+    return this.oversizedPieces;
+  }
+
+  public canAccommodate(art: Art): boolean {
+    if (this.rules.disallowedProductTypes.has(art.getProductType())) {
+      return false;
+    }
+
+    if (art.requiresCrateOnly()) {
+      return false;
+    }
+
+    if (art.needsCustomPackaging()) {
+      return false;
+    }
+
+    if (!this.fitsDimensions(art)) {
+      return false;
+    }
+
+    const quantity = art.getQuantity();
+    const type = art.getProductType();
+    const currentCount = this.counts.get(type) ?? 0;
+    const limit = this.rules.maxPiecesPerProduct[type];
+
+    if (limit !== undefined && currentCount + quantity > limit) {
+      return false;
+    }
+
+    if (art.isOversized()) {
+      if (this.oversizedPieces + quantity > this.rules.maxOversizedPieces) {
+        return false;
+      }
+    }
+
+    if (Number.isFinite(this.nominalCapacity) && this.totalPieces + quantity > this.nominalCapacity) {
+      return false;
+    }
+
+    return true;
+  }
+
+  public addArt(art: Art): boolean {
+    if (!this.canAccommodate(art)) {
+      return false;
+    }
+
+    this.contents.push(art);
+
+    const type = art.getProductType();
+    const quantity = art.getQuantity();
+    const updatedCount = (this.counts.get(type) ?? 0) + quantity;
+    this.counts.set(type, updatedCount);
+
+    this.totalPieces += quantity;
+
+    if (art.isOversized()) {
+      this.oversizedPieces += quantity;
+    }
+
+    this.totalWeight += art.getWeight();
+    return true;
+  }
+
   public isAtCapacity(): boolean {
-    return false;
+    if (!Number.isFinite(this.nominalCapacity)) {
+      return false;
+    }
+
+    return this.totalPieces >= this.nominalCapacity;
   }
 
   public getRemainingCapacity(): number {
-    return 0;
+    if (!Number.isFinite(this.nominalCapacity)) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    return Math.max(0, this.nominalCapacity - this.totalPieces);
   }
 
   public getTotalWeight(): number {
-    // Supports crate weight calculation by exposing aggregate box weight (Step 8 requirement).
-    return 0;
+    return Math.ceil(this.totalWeight);
+  }
+
+  public getFootprint(): { length: number; width: number; height: number } {
+    return {
+      length: this.spec.innerLength,
+      width: this.spec.innerWidth,
+      height: this.spec.innerHeight,
+    };
+  }
+
+  private fitsDimensions(art: Art): boolean {
+    const artFootprint = art.getPlanarFootprint();
+    const boxPlanar = [this.spec.innerLength, this.spec.innerWidth].sort((a, b) => b - a);
+    const artPlanar = [artFootprint.longSide, artFootprint.shortSide].sort((a, b) => b - a);
+
+    if (artPlanar[0] > boxPlanar[0]) {
+      return false;
+    }
+
+    if (artPlanar[1] > boxPlanar[1]) {
+      return false;
+    }
+
+    if (art.getDepth() > this.spec.innerHeight) {
+      return false;
+    }
+
+    if (this.spec.type === BoxType.Standard && art.isOversized()) {
+      return false;
+    }
+
+    if (this.spec.type === BoxType.UpsSmall || this.spec.type === BoxType.UpsLarge) {
+      // TODO: enforce parcel service product restrictions once business confirms mappings.
+    }
+
+    return true;
   }
 }

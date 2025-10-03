@@ -1,168 +1,189 @@
 /**
- * Art represents a single piece to be packed. The eventual implementation must provide:
- * - Constructor or factory receiving identifiers, product type (ArtType), dimensions, weight,
- *   and any special-handling flags parsed from the CSV.
- * - Immutable getters so interactors and boxes can query characteristics without mutating state.
- * - Derived helpers (e.g., getLargestDimension) used by packing rules to quickly determine fit.
- * When these methods are implemented according to the above, the rest of the pipeline
- * (parser -> interactor -> response) will have all the data required to evaluate capacity,
- * weight, and handling rules.
+ * Art represents a physical piece that must be packaged. The implementation captures the
+ * attributes required by downstream packing rules: product category, material weights,
+ * exterior dimensions (including depth padding), quantity, and special-handling flags.
  */
 export interface Dimensions {
+  /** Outside length in inches (longest horizontal edge). */
   length: number;
+  /** Outside width in inches (shorter horizontal edge). */
   width: number;
-  height: number;
+  /** Outside depth in inches (thickness). */
+  height?: number;
 }
 
 export enum ArtType {
-  // Final Medium types from your business requirements
-  PaperPrint = "PAPER_PRINT",
-  PaperPrintWithTitlePlate = "PAPER_PRINT_WITH_TITLE_PLATE",
-  CanvasFloatFrame = "CANVAS_FLOAT_FRAME",
-  WallDecor = "WALL_DECOR",
+  FramedPrint = "FRAMED_PRINT",
+  Canvas = "CANVAS",
   AcousticPanel = "ACOUSTIC_PANEL",
   AcousticPanelFramed = "ACOUSTIC_PANEL_FRAMED",
-  MetalPrint = "METAL_PRINT",
   Mirror = "MIRROR",
+  WallDecor = "WALL_DECOR",
+  PatientBoard = "PATIENT_BOARD",
+  Other = "OTHER",
 }
 
-export enum GlazingType {
+export enum ArtMaterial {
   Glass = "GLASS",
   Acrylic = "ACRYLIC",
-  NoGlazing = "NO_GLAZING",
+  CanvasFramed = "CANVAS_FRAMED",
+  CanvasGallery = "CANVAS_GALLERY",
+  Mirror = "MIRROR",
+  AcousticPanel = "ACOUSTIC_PANEL",
+  AcousticPanelFramed = "ACOUSTIC_PANEL_FRAMED",
+  PatientBoard = "PATIENT_BOARD",
+  Unknown = "UNKNOWN",
+}
+
+export enum SpecialHandlingFlag {
+  TactilePanel = "TACTILE_PANEL",
+  RaisedFloat = "RAISED_FLOAT",
+  ManualReview = "MANUAL_REVIEW",
+}
+
+export interface ArtCreationOptions {
+  id: string;
+  productType: ArtType;
+  material: ArtMaterial;
+  dimensions: Dimensions;
+  quantity?: number;
+  specialHandlingFlags?: SpecialHandlingFlag[];
+  description?: string;
+}
+
+const MATERIAL_WEIGHT_LB_PER_SQIN: Record<ArtMaterial, number> = {
+  [ArtMaterial.Glass]: 0.0098,
+  [ArtMaterial.Acrylic]: 0.0094,
+  [ArtMaterial.CanvasFramed]: 0.0085,
+  [ArtMaterial.CanvasGallery]: 0.0061,
+  [ArtMaterial.Mirror]: 0.0191,
+  [ArtMaterial.AcousticPanel]: 0.0038,
+  [ArtMaterial.AcousticPanelFramed]: 0.0037,
+  [ArtMaterial.PatientBoard]: 0.0347,
+  [ArtMaterial.Unknown]: 0.0,
+};
+
+const DEFAULT_DEPTH_PADDING_INCHES = 4;
+
+/**
+ * Rule 11: round all weights and dimensions up to the next whole number to stay conservative.
+ */
+function roundUp(value: number): number {
+  return Math.ceil(value);
 }
 
 export class Art {
-  private readonly sku: string;
+  private readonly id: string;
   private readonly productType: ArtType;
-  private readonly glazingType: GlazingType;
-  private readonly dimensions: Dimensions;
-  private readonly weight: number;
-  private readonly specialHandling: boolean;
+  private readonly material: ArtMaterial;
+  private readonly length: number;
+  private readonly width: number;
+  private readonly depth: number;
+  private readonly quantity: number;
+  private readonly flags: Set<SpecialHandlingFlag>;
+  private readonly description?: string;
 
-  constructor(
-    sku: string,
-    productType: ArtType,
-    glazingType: GlazingType,
-    dimensions: Dimensions,
-    weight: number,
-    specialHandling: boolean = false
-  ) {
-    this.sku = sku;
-    this.productType = productType;
-    this.glazingType = glazingType;
-    this.dimensions = dimensions;
-    this.weight = weight;
-    this.specialHandling = specialHandling;
+  constructor(options: ArtCreationOptions) {
+    this.id = options.id;
+    this.productType = options.productType;
+    this.material = options.material;
+    this.length = options.dimensions.length;
+    this.width = options.dimensions.width;
+    const depth = options.dimensions.height ?? DEFAULT_DEPTH_PADDING_INCHES;
+    this.depth = depth;
+    this.quantity = options.quantity ?? 1;
+    this.flags = new Set(options.specialHandlingFlags ?? []);
+    this.description = options.description;
   }
 
-  public getSku(): string {
-    return this.sku;
+  public getId(): string {
+    return this.id;
+  }
+
+  public getDescription(): string | undefined {
+    return this.description;
   }
 
   public getProductType(): ArtType {
     return this.productType;
   }
 
-  public getGlazingType(): GlazingType {
-    return this.glazingType;
+  public getMaterial(): ArtMaterial {
+    return this.material;
   }
 
-  public getDimensions(): Dimensions {
-    return { ...this.dimensions };
+  public getQuantity(): number {
+    return this.quantity;
+  }
+
+  public getDimensions(): { length: number; width: number; height: number } {
+    return {
+      length: roundUp(this.length),
+      width: roundUp(this.width),
+      height: roundUp(this.depth),
+    };
+  }
+
+  public getDepth(): number {
+    return roundUp(this.depth);
   }
 
   public getWeight(): number {
-    return this.weight;
+    const weightFactor = MATERIAL_WEIGHT_LB_PER_SQIN[this.material] ?? 0;
+    const surfaceArea = this.length * this.width;
+    const rawWeight = surfaceArea * weightFactor * this.quantity;
+    return roundUp(rawWeight);
   }
 
   public requiresSpecialHandling(): boolean {
-    return this.specialHandling;
+    if (this.flags.size > 0) {
+      return true;
+    }
+
+    return (
+      this.productType === ArtType.Mirror ||
+      this.productType === ArtType.WallDecor ||
+      this.productType === ArtType.AcousticPanelFramed ||
+      this.productType === ArtType.PatientBoard
+    );
+  }
+
+  public requiresCrateOnly(): boolean {
+    return this.productType === ArtType.Mirror;
+  }
+
+  public isOversized(): boolean {
+    const dimensions = this.getDimensions();
+    if (dimensions.length > 44 || dimensions.width > 44) {
+      return true;
+    }
+    if (dimensions.length > 36 || dimensions.width > 36) {
+      return true;
+    }
+    return dimensions.length >= 36.5 && dimensions.width >= 36.5;
+  }
+
+  public needsCustomPackaging(): boolean {
+    const dimensions = this.getDimensions();
+    return dimensions.length > 44 || dimensions.width > 44;
   }
 
   public getLargestDimension(): number {
-    return Math.max(this.dimensions.length, this.dimensions.width, this.dimensions.height);
+    const dims = this.getDimensions();
+    return Math.max(dims.length, dims.width, dims.height);
   }
 
-  public getVolume(): number {
-    return this.dimensions.length * this.dimensions.width * this.dimensions.height;
+  public getPlanarFootprint(): { longSide: number; shortSide: number } {
+    const dims = this.getDimensions();
+    const ordered = [dims.length, dims.width].sort((a, b) => b - a);
+    return {
+      longSide: ordered[0],
+      shortSide: ordered[1],
+    };
   }
 
-  /**
-   * Factory method to create Art from CSV row data
-   */
-  public static fromCsvRow(row: Record<string, string>): Art {
-    const sku = row.sku || row.SKU || row.id || row.ID;
-    if (!sku) {
-      throw new Error("Missing required field: SKU");
-    }
-
-    // Parse product type (Final Medium)
-    const productTypeStr = (row.productType || row.product_type || row.type || row.TYPE || "").toUpperCase();
-    let productType: ArtType;
-    switch (productTypeStr) {
-      case "PAPER_PRINT":
-        productType = ArtType.PaperPrint;
-        break;
-      case "PAPER_PRINT_WITH_TITLE_PLATE":
-        productType = ArtType.PaperPrintWithTitlePlate;
-        break;
-      case "CANVAS_FLOAT_FRAME":
-        productType = ArtType.CanvasFloatFrame;
-        break;
-      case "WALL_DECOR":
-        productType = ArtType.WallDecor;
-        break;
-      case "ACOUSTIC_PANEL":
-        productType = ArtType.AcousticPanel;
-        break;
-      case "ACOUSTIC_PANEL_FRAMED":
-        productType = ArtType.AcousticPanelFramed;
-        break;
-      case "METAL_PRINT":
-        productType = ArtType.MetalPrint;
-        break;
-      case "MIRROR":
-        productType = ArtType.Mirror;
-        break;
-      default:
-        throw new Error(`Invalid product type: ${productTypeStr}. Expected: PAPER_PRINT, PAPER_PRINT_WITH_TITLE_PLATE, CANVAS_FLOAT_FRAME, WALL_DECOR, ACOUSTIC_PANEL, ACOUSTIC_PANEL_FRAMED, METAL_PRINT, MIRROR`);
-    }
-
-    // Parse glazing type
-    const glazingTypeStr = (row.glazingType || row.glazing_type || row.glazing || row.GLAZING || "").toUpperCase();
-    let glazingType: GlazingType;
-    switch (glazingTypeStr) {
-      case "GLASS":
-        glazingType = GlazingType.Glass;
-        break;
-      case "ACRYLIC":
-        glazingType = GlazingType.Acrylic;
-        break;
-      case "NO_GLAZING":
-      case "NO GLAZING":
-        glazingType = GlazingType.NoGlazing;
-        break;
-      default:
-        throw new Error(`Invalid glazing type: ${glazingTypeStr}. Expected: GLASS, ACRYLIC, NO_GLAZING`);
-    }
-
-    const length = parseFloat(row.length || row.Length || row.l || row.L || "0");
-    const width = parseFloat(row.width || row.Width || row.w || row.W || "0");
-    const height = parseFloat(row.height || row.Height || row.h || row.H || "0");
-
-    if (length <= 0 || width <= 0 || height <= 0) {
-      throw new Error(`Invalid dimensions: length=${length}, width=${width}, height=${height}. All dimensions must be positive.`);
-    }
-
-    const weight = parseFloat(row.weight || row.Weight || row.wt || row.WT || "0");
-    if (weight <= 0) {
-      throw new Error(`Invalid weight: ${weight}. Weight must be positive.`);
-    }
-
-    const specialHandling = parseBoolean(row.specialHandling || row.special_handling || row.special || row.SPECIAL || "false");
-
-    return new Art(sku, productType, glazingType, { length, width, height }, weight, specialHandling);
+  public getSpecialHandlingFlags(): SpecialHandlingFlag[] {
+    return Array.from(this.flags);
   }
 }
 

@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import csvParse from "csv-parser";
-import { Art } from "../entities/Art";
+import { Art, ArtMaterial, ArtType } from "../entities/Art";
+
 
 export interface ParseResult {
   artItems: Art[];
