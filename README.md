@@ -19,7 +19,7 @@ team-project-4504-ydm was created by GitHub Classroom.
 
 ## Module Ownership Checklist
 - **Input & Parsing Pipeline** (`cli/`, `app/parser/`, `app/requests/`)
-  - Owner: *TBD*
+  - Owner: Daniel
   - Handle CLI argument validation, error reporting, and request assembly.
   - Implement CSV parsing and map rows into intermediate data structures.
   - Coordinate conversion from parsed data into `Art` entities.
@@ -29,7 +29,7 @@ team-project-4504-ydm was created by GitHub Classroom.
   - Enforce capacity, dimension, and special handling rules.
   - Provide weight/volume calculations consumed by interactors.
 - **Use Case Orchestration & Responses** (`app/interactors/`, `app/responses/`)
-  - Owner: *TBD*
+  - Owner: Martin
   - Implement box/crate packing algorithms and manage fallback paths.
   - Aggregate entity data into `PackagingResponse` DTOs.
   - Maintain response schema evolution as reporting needs change.
