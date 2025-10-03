@@ -61,13 +61,14 @@ interface BoxRules {
 
 const DEFAULT_BOX_RULES: BoxRules = {
   maxPiecesPerProduct: {
-    [ArtType.FramedPrint]: 6,
-    [ArtType.Canvas]: DEFAULT_CANVAS_PIECES_PER_BOX,
+    [ArtType.PaperPrint]: 6,
+    [ArtType.PaperPrintWithTitlePlate]: 6,
+    [ArtType.CanvasFloatFrame]: DEFAULT_CANVAS_PIECES_PER_BOX,
     [ArtType.AcousticPanel]: 4,
     [ArtType.AcousticPanelFramed]: 4,
+    [ArtType.MetalPrint]: 6,
     [ArtType.Mirror]: 0, // Mirrors are crate-only per packing guidance.
     [ArtType.WallDecor]: 6,
-    [ArtType.PatientBoard]: 6,
   },
   maxOversizedPieces: 3,
   disallowedProductTypes: new Set([ArtType.Mirror]),
