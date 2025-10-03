@@ -1,37 +1,131 @@
-import { Box } from "./Box";
+import { Box, BoxType } from "./Box";
 
-/**
- * Crate (or pallet) groups boxes for shipment. Implementation requirements:
- * - Track contained boxes and expose read-only snapshots via getContents.
- * - Enforce capacity rules (max boxes, height/weight thresholds) within canAccommodate/isAtCapacity.
- * - calculateWeight should sum each box weight plus crate/pallet overhead supplied via parameter.
- * - Future enhancements may differentiate between crate vs pallet handling; keep data model flexible.
- */
+export enum CrateType {
+  StandardCrate = "STANDARD_CRATE",
+  StandardPallet = "STANDARD_PALLET",
+  GlassPallet = "GLASS_PALLET",
+  OversizePallet = "OVERSIZE_PALLET",
+}
+
+export enum ContainerKind {
+  Crate = "CRATE",
+  Pallet = "PALLET",
+}
+
+interface CrateSpecification {
+  type: CrateType;
+  containerKind: ContainerKind;
+  tareWeight: number;
+  maxBoxes?: number;
+  allowedBoxTypes?: readonly BoxType[];
+  notes?: string;
+}
+
+const CRATE_SPECIFICATIONS: Record<CrateType, CrateSpecification> = {
+  [CrateType.StandardCrate]: {
+    type: CrateType.StandardCrate,
+    containerKind: ContainerKind.Crate,
+    tareWeight: 125,
+    // TODO: capture max box capacity for crate shipping once confirmed.
+    notes: "Most protective option; can also accept loose items per Bri's rules.",
+  },
+  [CrateType.StandardPallet]: {
+    type: CrateType.StandardPallet,
+    containerKind: ContainerKind.Pallet,
+    tareWeight: 60,
+    maxBoxes: 4,
+    allowedBoxTypes: [BoxType.Standard],
+    notes: "48x40 pallet with four standard boxes (rule of thumb).",
+  },
+  [CrateType.GlassPallet]: {
+    type: CrateType.GlassPallet,
+    containerKind: ContainerKind.Pallet,
+    tareWeight: 60,
+    maxBoxes: 4,
+    allowedBoxTypes: [BoxType.Standard],
+    notes: "43x35 glass pallet; use for small glass shipments (rule may vary).",
+  },
+  [CrateType.OversizePallet]: {
+    type: CrateType.OversizePallet,
+    containerKind: ContainerKind.Pallet,
+    tareWeight: 75,
+    maxBoxes: 5,
+    allowedBoxTypes: [BoxType.Standard, BoxType.Large],
+    notes: "60x40 pallet; holds five standard boxes or a mix with oversized boxes.",
+  },
+};
+
+export interface CrateOptions {
+  type?: CrateType;
+}
+
 export class Crate {
+  private readonly spec: CrateSpecification;
   private readonly contents: Box[] = [];
+  private totalWeight: number;
 
-  public canAccommodate(box: Box): boolean {
-    return false;
+  constructor(options: CrateOptions = {}) {
+    const type = options.type ?? CrateType.StandardCrate;
+    this.spec = CRATE_SPECIFICATIONS[type];
+    this.totalWeight = this.spec.tareWeight;
   }
 
-  public addBox(box: Box): boolean {
-    this.contents.push(box);
-    return false;
+  public getType(): CrateType {
+    return this.spec.type;
+  }
+
+  public getContainerKind(): ContainerKind {
+    return this.spec.containerKind;
+  }
+
+  public getSpecification(): CrateSpecification {
+    return this.spec;
   }
 
   public getContents(): Box[] {
     return [...this.contents];
   }
 
+  public canAccommodate(box: Box): boolean {
+    if (this.spec.allowedBoxTypes && !this.spec.allowedBoxTypes.includes(box.getType())) {
+      return false;
+    }
+
+    if (this.spec.maxBoxes !== undefined && this.contents.length >= this.spec.maxBoxes) {
+      return false;
+    }
+
+    // TODO: enforce combined height/weight limits once confirmed by business.
+    return true;
+  }
+
+  public addBox(box: Box): boolean {
+    if (!this.canAccommodate(box)) {
+      return false;
+    }
+
+    this.contents.push(box);
+    this.totalWeight += box.getTotalWeight();
+    return true;
+  }
+
   public isAtCapacity(): boolean {
-    return false;
+    if (this.spec.maxBoxes === undefined) {
+      return false;
+    }
+
+    return this.contents.length >= this.spec.maxBoxes;
   }
 
   public getRemainingCapacity(): number {
-    return 0;
+    if (this.spec.maxBoxes === undefined) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    return Math.max(0, this.spec.maxBoxes - this.contents.length);
   }
 
   public calculateWeight(overhead: number): number {
-    return 0;
+    return Math.ceil(this.totalWeight + overhead);
   }
 }
