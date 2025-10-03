@@ -1,4 +1,4 @@
-import { Art } from "../entities/Art";
+import { Art, ArtMaterial, ArtType } from "../entities/Art";
 
 /**
  * parse is responsible for transforming a CSV file into Art domain entities.
@@ -14,7 +14,15 @@ import { Art } from "../entities/Art";
  *   reported upstream. For the initial milestone, returning Art[] is sufficient.
  */
 export async function parse(csvFilePath: string): Promise<Art[]> {
-  // TODO: adapt once Art exposes constructors/factories for real data mapping.
+  // TODO: replace the placeholder Art instance with parsed data from the CSV file.
   void csvFilePath;
-  return [new Art()];
+  return [
+    new Art({
+      id: "placeholder-art",
+      productType: ArtType.FramedPrint,
+      material: ArtMaterial.Glass,
+      dimensions: { length: 30, width: 24, height: 4 },
+      quantity: 1,
+    }),
+  ];
 }
