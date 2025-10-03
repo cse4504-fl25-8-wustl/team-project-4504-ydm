@@ -186,3 +186,11 @@ export class Art {
     return Array.from(this.flags);
   }
 }
+
+/**
+ * Helper function to parse boolean values from CSV strings
+ */
+function parseBoolean(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return ["y", "yes", "true", "1", "special"].includes(normalized);
+}

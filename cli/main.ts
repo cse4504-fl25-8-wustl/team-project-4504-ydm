@@ -1,6 +1,7 @@
 import process from "node:process";
+import { existsSync } from "node:fs";
 
-import { parse } from "../app/parser/CsvParser";
+import { parse, validateCsvStructure } from "../app/parser/CsvParser";
 import { PackagingInteractor } from "../app/interactors/PackagingInteractor";
 import type { PackagingRequest } from "../app/requests/PackagingRequest";
 
@@ -87,8 +88,40 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Placeholder CSV parsing hook; currently returns dummy Art entities.
-  const artItems = await parse(csvFilePath);
+  // Validate CSV file exists and structure
+  if (!existsSync(csvFilePath)) {
+    console.error(`Error: CSV file '${csvFilePath}' does not exist.`);
+    process.exit(1);
+  }
+
+  // Validate CSV structure before parsing
+  try {
+    const structureValidation = await validateCsvStructure(csvFilePath);
+    if (!structureValidation.isValid) {
+      console.error("CSV file validation failed:");
+      structureValidation.errors.forEach(error => console.error(`  - ${error}`));
+      process.exit(1);
+    }
+  } catch (error) {
+    console.error(`Error validating CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    process.exit(1);
+  }
+
+  // Parse CSV file into Art entities
+  let artItems;
+  try {
+    artItems = await parse(csvFilePath);
+    
+    if (artItems.length === 0) {
+      console.error("Error: No valid art items found in CSV file.");
+      process.exit(1);
+    }
+    
+    console.error(`Successfully parsed ${artItems.length} art items from CSV.`);
+  } catch (error) {
+    console.error(`Error parsing CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    process.exit(1);
+  }
 
   const request: PackagingRequest = {
     artItems,

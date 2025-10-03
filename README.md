@@ -19,7 +19,7 @@ team-project-4504-ydm was created by GitHub Classroom.
 
 ## Module Ownership Checklist
 - **Input & Parsing Pipeline** (`cli/`, `app/parser/`, `app/requests/`)
-  - Owner: Daniel
+  - Owner: @Daniel Yan
   - Handle CLI argument validation, error reporting, and request assembly.
   - Implement CSV parsing and map rows into intermediate data structures.
   - Coordinate conversion from parsed data into `Art` entities.
