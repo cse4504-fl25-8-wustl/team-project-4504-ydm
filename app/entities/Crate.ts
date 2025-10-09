@@ -1,25 +1,38 @@
 import { Box, BoxType } from "./Box";
 
 export enum CrateType {
-  StandardCrate = "STANDARD_CRATE",
-  StandardPallet = "STANDARD_PALLET",
-  GlassPallet = "GLASS_PALLET",
-  OversizePallet = "OVERSIZE_PALLET",
+  StandardCrate,
+  StandardPallet,
+  GlassPallet,
+  OversizePallet,
 }
 
 export enum ContainerKind {
-  Crate = "CRATE",
-  Pallet = "PALLET",
+  Crate,
+  Pallet,
+}
+
+const CRATE_TYPE_LABELS: Record<CrateType, string> = {
+  [CrateType.StandardCrate]: "STANDARD_CRATE",
+  [CrateType.StandardPallet]: "STANDARD_PALLET",
+  [CrateType.GlassPallet]: "GLASS_PALLET",
+  [CrateType.OversizePallet]: "OVERSIZE_PALLET",
+};
+
+export function getCrateTypeLabel(type: CrateType): string {
+  return CRATE_TYPE_LABELS[type];
 }
 
 interface CrateSpecification {
   type: CrateType;
   containerKind: ContainerKind;
   tareWeight: number;
-  maxBoxes?: number;
+  maxBoxes: number;
   allowedBoxTypes?: readonly BoxType[];
   notes?: string;
 }
+
+const MAX_STACK_HEIGHT_IN = 84;
 
 const CRATE_SPECIFICATIONS: Record<CrateType, CrateSpecification> = {
   [CrateType.StandardCrate]: {
@@ -49,9 +62,9 @@ const CRATE_SPECIFICATIONS: Record<CrateType, CrateSpecification> = {
     type: CrateType.OversizePallet,
     containerKind: ContainerKind.Pallet,
     tareWeight: 75,
-    maxBoxes: 5,
+    maxBoxes: 6,
     allowedBoxTypes: [BoxType.Standard, BoxType.Large],
-    notes: "60x40 pallet; holds five standard boxes or a mix with oversized boxes.",
+    notes: "60x40 pallet; holds up to six standard or mixed oversized boxes.",
   },
 };
 
@@ -91,11 +104,15 @@ export class Crate {
       return false;
     }
 
-    if (this.spec.maxBoxes !== undefined && this.contents.length >= this.spec.maxBoxes) {
+    if (this.contents.length >= this.spec.maxBoxes) {
       return false;
     }
 
-    // TODO: enforce combined height/weight limits once confirmed by business.
+    const projectedHeight = this.getStackHeight() + box.getRequiredDimensions().height;
+    if (projectedHeight > MAX_STACK_HEIGHT_IN) {
+      return false;
+    }
+
     return true;
   }
 
@@ -110,18 +127,10 @@ export class Crate {
   }
 
   public isAtCapacity(): boolean {
-    if (this.spec.maxBoxes === undefined) {
-      return false;
-    }
-
     return this.contents.length >= this.spec.maxBoxes;
   }
 
   public getRemainingCapacity(): number {
-    if (this.spec.maxBoxes === undefined) {
-      return Number.POSITIVE_INFINITY;
-    }
-
     return Math.max(0, this.spec.maxBoxes - this.contents.length);
   }
 
@@ -135,5 +144,9 @@ export class Crate {
 
   public getTareWeight(): number {
     return this.spec.tareWeight;
+  }
+
+  private getStackHeight(): number {
+    return this.contents.reduce((sum, current) => sum + current.getRequiredDimensions().height, 0);
   }
 }

@@ -115,10 +115,12 @@ export async function parseWithDiagnostics(csvFilePath: string): Promise<ParseRe
             return;
           }
 
-          // Create Art instance from row data
-          const art = Art.fromCsvRow(row);
-          artItems.push(art);
-          validRows++;
+          // Create Art instances from row data (one per physical piece)
+          const pieces = Art.fromCsvRow(row);
+          for (const art of pieces) {
+            artItems.push(art);
+          }
+          validRows += pieces.length;
           
         } catch (error) {
           errors.push({
