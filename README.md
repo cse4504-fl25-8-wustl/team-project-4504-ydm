@@ -7,6 +7,31 @@ team-project-4504-ydm was created by GitHub Classroom.
   npm install -g pnpm
   pnpm install
   ```
+
+### Running Tests
+This project uses [Vitest](https://vitest.dev/) as the testing framework. The following commands are available:
+
+- **Run all tests once:**
+  ```bash
+  pnpm test:run
+  ```
+
+- **Run tests in watch mode (re-runs on file changes):**
+  ```bash
+  pnpm test
+  ```
+
+- **Run tests with UI (interactive test runner):**
+  ```bash
+  pnpm test:ui
+  ```
+
+- **Run tests with coverage report:**
+  ```bash
+  pnpm test:coverage
+  ```
+
+### Running the Application
 - Run the packaging workflow:
   ```bash
   pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery>
@@ -47,3 +72,9 @@ team-project-4504-ydm was created by GitHub Classroom.
 - `app/parser` isolates CSV parsing (currently a stub).
 - `app/requests` and `app/responses` host the DTOs that connect the CLI with the use cases.
 - `cli/main.ts` is the command-line entry point that wires parser, interactor, and response printing.
+
+## Testing
+- Test files are co-located with source files using the `.test.ts` extension
+- Unit tests are written using Vitest with TypeScript support
+- Tests cover entity classes, business logic, and utility functions
+- Example test file: `app/entities/Art.test.ts` demonstrates comprehensive testing of the Art entity
