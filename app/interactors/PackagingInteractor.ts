@@ -2,6 +2,8 @@ import { Art, ArtMaterial, ArtType } from "../entities/Art";
 import { Box, BoxType } from "../entities/Box";
 import { Crate, CrateType, ContainerKind } from "../entities/Crate";
 import { DeliveryCapabilities, PackagingRequest } from "../requests/PackagingRequest";
+import { PackagingRules } from "../rules/PackagingRules";
+import { WeightCalculator } from "../calculations/WeightCalculator";
 import {
   PackagingResponse,
   WeightSummary,
@@ -37,19 +39,19 @@ export class PackagingInteractor {
     const unassignedReasons: Record<string, string> = {};
 
     for (const art of artCollection) {
-      if (art.needsCustomPackaging()) {
+      if (PackagingRules.needsCustomPackaging(art)) {
         unassignedArt.push(art);
         unassignedReasons[art.getId()] = "Requires custom packaging (both sides exceed 43.5\")";
         continue;
       }
 
-      if (art.requiresCrateOnly()) {
+      if (PackagingRules.requiresCrateOnly(art)) {
         unassignedArt.push(art);
         unassignedReasons[art.getId()] = "Crate-only item; palletization handled later";
         continue;
       }
 
-      const preferredType = art.requiresOversizeBox() ? BoxType.Large : BoxType.Standard;
+      const preferredType = PackagingRules.requiresOversizeBox(art) ? BoxType.Large : BoxType.Standard;
       let targetBox = this.findBoxForArt(boxes, art, preferredType);
 
       if (!targetBox) {
@@ -173,13 +175,13 @@ export class PackagingInteractor {
   }
 
   private buildWeightSummary(artItems: Art[], containerResult: ContainerPackingResult): WeightSummary {
-    const totalArtworkWeight = artItems.reduce((sum, art) => sum + art.getWeight(), 0);
+    const totalArtworkWeight = artItems.reduce((sum, art) => sum + WeightCalculator.calculateWeight(art), 0);
     const glassWeight = artItems
       .filter((art) => art.getMaterial() === ArtMaterial.Glass)
-      .reduce((sum, art) => sum + art.getWeight(), 0);
+      .reduce((sum, art) => sum + WeightCalculator.calculateWeight(art), 0);
     const oversizedWeight = artItems
-      .filter((art) => art.requiresOversizeBox())
-      .reduce((sum, art) => sum + art.getWeight(), 0);
+      .filter((art) => PackagingRules.requiresOversizeBox(art))
+      .reduce((sum, art) => sum + WeightCalculator.calculateWeight(art), 0);
 
     const pallets = containerResult.containers.filter((container) => container.getContainerKind() === ContainerKind.Pallet);
     const crates = containerResult.containers.filter((container) => container.getContainerKind() === ContainerKind.Crate);

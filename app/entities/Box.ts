@@ -1,4 +1,6 @@
 import { Art, ArtType } from "./Art";
+import { PackagingRules } from "../rules/PackagingRules";
+import { WeightCalculator } from "../calculations/WeightCalculator";
 
 export enum BoxType {
   Standard = "STANDARD",
@@ -153,11 +155,11 @@ export class Box {
       return false;
     }
 
-    if (art.requiresCrateOnly()) {
+    if (PackagingRules.requiresCrateOnly(art)) {
       return false;
     }
 
-    if (art.needsCustomPackaging()) {
+    if (PackagingRules.needsCustomPackaging(art)) {
       return false;
     }
 
@@ -174,7 +176,7 @@ export class Box {
       return false;
     }
 
-    if (art.isOversized()) {
+    if (PackagingRules.isOversized(art)) {
       if (this.oversizedPieces + quantity > this.rules.maxOversizedPieces) {
         return false;
       }
@@ -201,14 +203,14 @@ export class Box {
 
     this.totalPieces += quantity;
 
-    if (art.isOversized()) {
+    if (PackagingRules.isOversized(art)) {
       this.oversizedPieces += quantity;
     }
 
-    this.totalWeight += art.getWeight();
+    this.totalWeight += WeightCalculator.calculateWeight(art);
 
     const dims = art.getDimensions();
-    const footprint = art.getPlanarFootprint();
+    const footprint = PackagingRules.getPlanarFootprint(art);
     this.requiredLength = Math.max(this.requiredLength, footprint.longSide);
     this.requiredWidth = Math.max(this.requiredWidth, footprint.shortSide);
     this.requiredHeight = Math.max(this.requiredHeight, dims.height);
@@ -264,7 +266,7 @@ export class Box {
   }
 
   private fitsDimensions(art: Art): boolean {
-    const footprint = art.getPlanarFootprint();
+    const footprint = PackagingRules.getPlanarFootprint(art);
     const depth = art.getDepth();
 
     switch (this.spec.type) {
