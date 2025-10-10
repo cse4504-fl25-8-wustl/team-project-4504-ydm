@@ -295,7 +295,7 @@ export class PackagingInteractor {
 
       const entry = hardwareLineItems.get(label)!;
       entry.totalPieces += pieces;
-      entry.artQuantity += art.getQuantity();
+      entry.artQuantity += 1;
     };
 
     boxResult.assignments.forEach(({ art }) => {
