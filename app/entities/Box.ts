@@ -189,11 +189,12 @@ export class Box {
       return false;
     }
 
+    const quantity = art.getQuantity();
     const type = art.getProductType();
     const currentCount = this.counts.get(type) ?? 0;
     const limit = this.rules.maxPiecesPerProduct[type];
 
-    if (limit !== undefined && currentCount + 1 > limit) {
+    if (limit !== undefined && currentCount + quantity > limit) {
       return false;
     }
 
@@ -203,7 +204,7 @@ export class Box {
       }
     }
 
-    if (Number.isFinite(this.nominalCapacity) && this.totalPieces + 1 > this.nominalCapacity) {
+    if (Number.isFinite(this.nominalCapacity) && this.totalPieces + quantity > this.nominalCapacity) {
       return false;
     }
 
@@ -218,10 +219,11 @@ export class Box {
     this.contents.push(art);
 
     const type = art.getProductType();
-    const updatedCount = (this.counts.get(type) ?? 0) + 1;
+    const quantity = art.getQuantity();
+    const updatedCount = (this.counts.get(type) ?? 0) + quantity;
     this.counts.set(type, updatedCount);
 
-    this.totalPieces += 1;
+    this.totalPieces += quantity;
 
     if (PackagingRules.isOversized(art)) {
       this.oversizedPieces += quantity;

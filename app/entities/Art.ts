@@ -87,6 +87,7 @@ export interface ArtCreationOptions {
   productType: ArtType;
   material: ArtMaterial;
   dimensions: Dimensions;
+  quantity?: number;
   specialHandlingFlags?: SpecialHandlingFlag[];
   description?: string;
   finalMediumLabel?: string;
@@ -104,12 +105,13 @@ export class Art {
   private readonly length: number;
   private readonly width: number;
   private readonly depth: number;
+  private readonly quantity: number;
   private readonly flags: Set<SpecialHandlingFlag>;
   private readonly description?: string;
   private readonly finalMediumLabel?: string;
   private readonly glazingLabel?: string;
   private readonly hardwareLabel?: string;
-  private readonly hardwarePieces?: number;
+  private readonly hardwarePiecesPerItem?: number;
 
 
   constructor(options: ArtCreationOptions) {
@@ -120,12 +122,13 @@ export class Art {
     this.width = options.dimensions.width;
     const depth = options.dimensions.height ?? DEFAULT_DEPTH_PADDING_INCHES;
     this.depth = depth;
+    this.quantity = options.quantity ?? 1;
     this.flags = new Set(options.specialHandlingFlags ?? []);
     this.description = options.description;
     this.finalMediumLabel = options.finalMediumLabel;
     this.glazingLabel = options.glazingLabel;
     this.hardwareLabel = options.hardwareLabel;
-    this.hardwarePieces = options.hardwarePiecesPerItem;
+    this.hardwarePiecesPerItem = options.hardwarePiecesPerItem;
   }
 
   public getId(): string {
@@ -154,6 +157,31 @@ export class Art {
 
   public getMaterialLabel(): string {
     return getArtMaterialLabel(this.material);
+  }
+
+  public getQuantity(): number {
+    return this.quantity;
+  }
+
+  public getFinalMediumLabel(): string | undefined {
+    return this.finalMediumLabel;
+  }
+
+  public getGlazingLabel(): string | undefined {
+    return this.glazingLabel;
+  }
+
+  public getHardwareLabel(): string | undefined {
+    return this.hardwareLabel;
+  }
+
+  public getHardwarePiecesPerItem(): number | undefined {
+    return this.hardwarePiecesPerItem;
+  }
+
+  public getHardwarePiecesTotal(): number {
+    const piecesPerItem = this.hardwarePiecesPerItem ?? 0;
+    return piecesPerItem * this.quantity;
   }
 
   /**
