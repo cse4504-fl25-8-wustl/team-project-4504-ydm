@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import csvParse from "csv-parser";
 import { Art } from "../entities/Art";
+import { ArtTranslator } from "./ArtTranslator";
 
 const HEADER_ALIASES: Record<string, string> = {
   "line number": "lineNumber",
@@ -115,9 +116,18 @@ export async function parseWithDiagnostics(csvFilePath: string): Promise<ParseRe
             return;
           }
 
-          // Create Art instance from row data
-          const art = Art.fromCsvRow(row);
-          artItems.push(art);
+          // Create Art instances from row data using translator
+          const translationResult = ArtTranslator.translateFromCsvRow(row);
+          if (translationResult.errors.length > 0) {
+            errors.push({
+              row: totalRows,
+              error: translationResult.errors.join('; '),
+              data: row
+            });
+            return;
+          }
+          
+          artItems.push(...translationResult.artItems);
           validRows++;
           
         } catch (error) {

@@ -165,22 +165,21 @@ export class Box {
       return false;
     }
 
-    const quantity = art.getQuantity();
     const type = art.getProductType();
     const currentCount = this.counts.get(type) ?? 0;
     const limit = this.rules.maxPiecesPerProduct[type];
 
-    if (limit !== undefined && currentCount + quantity > limit) {
+    if (limit !== undefined && currentCount + 1 > limit) {
       return false;
     }
 
     if (art.isOversized()) {
-      if (this.oversizedPieces + quantity > this.rules.maxOversizedPieces) {
+      if (this.oversizedPieces + 1 > this.rules.maxOversizedPieces) {
         return false;
       }
     }
 
-    if (Number.isFinite(this.nominalCapacity) && this.totalPieces + quantity > this.nominalCapacity) {
+    if (Number.isFinite(this.nominalCapacity) && this.totalPieces + 1 > this.nominalCapacity) {
       return false;
     }
 
@@ -195,14 +194,13 @@ export class Box {
     this.contents.push(art);
 
     const type = art.getProductType();
-    const quantity = art.getQuantity();
-    const updatedCount = (this.counts.get(type) ?? 0) + quantity;
+    const updatedCount = (this.counts.get(type) ?? 0) + 1;
     this.counts.set(type, updatedCount);
 
-    this.totalPieces += quantity;
+    this.totalPieces += 1;
 
     if (art.isOversized()) {
-      this.oversizedPieces += quantity;
+      this.oversizedPieces += 1;
     }
 
     this.totalWeight += art.getWeight();
@@ -264,48 +262,27 @@ export class Box {
   }
 
   private fitsDimensions(art: Art): boolean {
-    const footprint = art.getPlanarFootprint();
+    const { PackagingRules } = require("../rules/PackagingRules");
     const depth = art.getDepth();
 
     switch (this.spec.type) {
       case BoxType.Standard: {
-        if (footprint.shortSide > 36) {
+        if (!PackagingRules.fitsInStandardBox(art)) {
           return false;
         }
-
-        if (footprint.longSide > 84) {
-          return false;
-        }
-
         return depth <= this.spec.innerHeight;
       }
 
       case BoxType.Large: {
-        if (footprint.longSide > 43.5 || footprint.shortSide > 43.5) {
+        if (!PackagingRules.fitsInLargeBox(art)) {
           return false;
         }
-
         return depth <= this.spec.innerHeight;
       }
 
       case BoxType.UpsSmall:
       case BoxType.UpsLarge: {
-        const boxPlanar = [this.spec.innerLength, this.spec.innerWidth].sort((a, b) => b - a);
-        const artPlanar = [footprint.longSide, footprint.shortSide].sort((a, b) => b - a);
-
-        if (artPlanar[0] > boxPlanar[0]) {
-          return false;
-        }
-
-        if (artPlanar[1] > boxPlanar[1]) {
-          return false;
-        }
-
-        if (depth > this.spec.innerHeight) {
-          return false;
-        }
-
-        return true;
+        return PackagingRules.fitsInUpsBox(art, this.spec.innerLength, this.spec.innerWidth, this.spec.innerHeight);
       }
 
       default:
