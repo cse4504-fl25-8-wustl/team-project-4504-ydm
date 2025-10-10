@@ -3,10 +3,21 @@ import { PackagingRules } from "../rules/PackagingRules";
 import { WeightCalculator } from "../calculations/WeightCalculator";
 
 export enum BoxType {
-  Standard = "STANDARD",
-  Large = "LARGE",
-  UpsSmall = "UPS_SMALL",
-  UpsLarge = "UPS_LARGE",
+  Standard,
+  Large,
+  UpsSmall,
+  UpsLarge,
+}
+
+const BOX_TYPE_LABELS: Record<BoxType, string> = {
+  [BoxType.Standard]: "STANDARD",
+  [BoxType.Large]: "LARGE",
+  [BoxType.UpsSmall]: "UPS_SMALL",
+  [BoxType.UpsLarge]: "UPS_LARGE",
+};
+
+export function getBoxTypeLabel(type: BoxType): string {
+  return BOX_TYPE_LABELS[type];
 }
 
 interface BoxSpecification {
@@ -15,6 +26,9 @@ interface BoxSpecification {
   innerWidth: number;
   innerHeight: number;
   tareWeight: number;
+  maxShortSideInches: number;
+  maxLongSideInches: number;
+  telescopeMaxLengthInches?: number;
   notes?: string;
 }
 
@@ -24,7 +38,10 @@ const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
     innerLength: 36,
     innerWidth: 36,
     innerHeight: 11,
-    tareWeight: 0, // TODO: confirm the actual tare weight for standard boxes.
+    tareWeight: 18,
+    maxShortSideInches: 36,
+    maxLongSideInches: 84,
+    telescopeMaxLengthInches: 84,
     notes: "Most common size; telescope up to 84 inches on the long edge when one side ≤36 inches.",
   },
   [BoxType.Large]: {
@@ -32,7 +49,9 @@ const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
     innerLength: 44,
     innerWidth: 44,
     innerHeight: 13,
-    tareWeight: 0, // TODO: capture the actual tare weight for large boxes.
+    tareWeight: 22,
+    maxShortSideInches: 43.5,
+    maxLongSideInches: 43.5,
     notes: ">36 inches in both directions; intended for oversized pieces up to ~43.5 inches.",
   },
   [BoxType.UpsSmall]: {
@@ -40,7 +59,9 @@ const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
     innerLength: 36,
     innerWidth: 36,
     innerHeight: 6,
-    tareWeight: 0,
+    tareWeight: 8,
+    maxShortSideInches: 36,
+    maxLongSideInches: 36,
     notes: "UPS parcel only; not suitable for fragile glazing (rule 15).",
   },
   [BoxType.UpsLarge]: {
@@ -48,7 +69,9 @@ const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
     innerLength: 44,
     innerWidth: 35,
     innerHeight: 6,
-    tareWeight: 0,
+    tareWeight: 10,
+    maxShortSideInches: 35,
+    maxLongSideInches: 44,
     notes: "Adjustable-length UPS carton; keep for durable acrylic shipments (rule 15).",
   },
 };
@@ -71,6 +94,7 @@ const DEFAULT_BOX_RULES: BoxRules = {
     [ArtType.MetalPrint]: 6,
     [ArtType.Mirror]: 0, // Mirrors are crate-only per packing guidance.
     [ArtType.WallDecor]: 6,
+    [ArtType.PatientBoard]: 2,
   },
   maxOversizedPieces: 3,
   disallowedProductTypes: new Set([ArtType.Mirror]),
@@ -118,11 +142,9 @@ export class Box {
 
     const finiteLimits = Object.values(mergedMaxPieces)
       .filter((limit): limit is number => typeof limit === "number" && Number.isFinite(limit));
-    if (finiteLimits.length > 0) {
-      this.nominalCapacity = Math.max(this.rules.maxOversizedPieces, ...finiteLimits);
-    } else {
-      this.nominalCapacity = this.rules.maxOversizedPieces;
-    }
+    this.nominalCapacity = finiteLimits.length > 0
+      ? Math.max(this.rules.maxOversizedPieces, ...finiteLimits)
+      : this.rules.maxOversizedPieces;
 
     this.totalWeight = this.spec.tareWeight;
     this.requiredLength = this.spec.innerLength;
@@ -167,12 +189,11 @@ export class Box {
       return false;
     }
 
-    const quantity = art.getQuantity();
     const type = art.getProductType();
     const currentCount = this.counts.get(type) ?? 0;
     const limit = this.rules.maxPiecesPerProduct[type];
 
-    if (limit !== undefined && currentCount + quantity > limit) {
+    if (limit !== undefined && currentCount + 1 > limit) {
       return false;
     }
 
@@ -182,7 +203,7 @@ export class Box {
       }
     }
 
-    if (Number.isFinite(this.nominalCapacity) && this.totalPieces + quantity > this.nominalCapacity) {
+    if (Number.isFinite(this.nominalCapacity) && this.totalPieces + 1 > this.nominalCapacity) {
       return false;
     }
 
@@ -197,11 +218,10 @@ export class Box {
     this.contents.push(art);
 
     const type = art.getProductType();
-    const quantity = art.getQuantity();
-    const updatedCount = (this.counts.get(type) ?? 0) + quantity;
+    const updatedCount = (this.counts.get(type) ?? 0) + 1;
     this.counts.set(type, updatedCount);
 
-    this.totalPieces += quantity;
+    this.totalPieces += 1;
 
     if (PackagingRules.isOversized(art)) {
       this.oversizedPieces += quantity;
@@ -254,7 +274,9 @@ export class Box {
       return null;
     }
 
-    return this.requiredLength > this.spec.innerLength ? this.requiredLength : null;
+    return this.requiredLength > (this.spec.telescopeMaxLengthInches ?? this.spec.innerLength)
+      ? this.requiredLength
+      : null;
   }
 
   public getFootprint(): { length: number; width: number; height: number } {
@@ -271,11 +293,11 @@ export class Box {
 
     switch (this.spec.type) {
       case BoxType.Standard: {
-        if (footprint.shortSide > 36) {
+        if (footprint.shortSide > this.spec.maxShortSideInches) {
           return false;
         }
 
-        if (footprint.longSide > 84) {
+        if (footprint.longSide > (this.spec.telescopeMaxLengthInches ?? this.spec.maxLongSideInches)) {
           return false;
         }
 
@@ -283,7 +305,7 @@ export class Box {
       }
 
       case BoxType.Large: {
-        if (footprint.longSide > 43.5 || footprint.shortSide > 43.5) {
+        if (footprint.longSide > this.spec.maxLongSideInches || footprint.shortSide > this.spec.maxShortSideInches) {
           return false;
         }
 

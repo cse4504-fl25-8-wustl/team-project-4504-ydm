@@ -14,34 +14,72 @@ export interface Dimensions {
 }
 
 export enum ArtType {
-  PaperPrint = "PAPER_PRINT",
-  PaperPrintWithTitlePlate = "PAPER_PRINT_WITH_TITLE_PLATE",
-  CanvasFloatFrame = "CANVAS_FLOAT_FRAME",
-  WallDecor = "WALL_DECOR",
-  AcousticPanel = "ACOUSTIC_PANEL",
-  AcousticPanelFramed = "ACOUSTIC_PANEL_FRAMED",
-  MetalPrint = "METAL_PRINT",
-  Mirror = "MIRROR",
-  PatientBoard = "PATIENT_BOARD",
+  PaperPrint,
+  PaperPrintWithTitlePlate,
+  CanvasFloatFrame,
+  WallDecor,
+  AcousticPanel,
+  AcousticPanelFramed,
+  MetalPrint,
+  Mirror,
+  PatientBoard,
 }
 
 export enum ArtMaterial {
-  Glass = "GLASS",
-  Acrylic = "ACRYLIC",
-  CanvasFramed = "CANVAS_FRAMED",
-  CanvasGallery = "CANVAS_GALLERY",
-  Mirror = "MIRROR",
-  AcousticPanel = "ACOUSTIC_PANEL",
-  AcousticPanelFramed = "ACOUSTIC_PANEL_FRAMED",
-  PatientBoard = "PATIENT_BOARD",
-  NoGlazing = "NO_GLAZING",
-  Unknown = "UNKNOWN",
+  Glass,
+  Acrylic,
+  CanvasFramed,
+  CanvasGallery,
+  Mirror,
+  AcousticPanel,
+  AcousticPanelFramed,
+  PatientBoard,
+  NoGlazing,
+  Unknown,
 }
 
 export enum SpecialHandlingFlag {
-  TactilePanel = "TACTILE_PANEL",
-  RaisedFloat = "RAISED_FLOAT",
-  ManualReview = "MANUAL_REVIEW",
+  TactilePanel,
+  RaisedFloat,
+  ManualReview,
+}
+
+// We keep a lookup table so the domain logic can use numeric enums (as requested by code review)
+// while consumers that emit JSON/logs can still retrieve the human-readable string representation
+// that existed before (e.g., "PAPER_PRINT").
+const ART_TYPE_LABELS: Record<ArtType, string> = {
+  [ArtType.PaperPrint]: "PAPER_PRINT",
+  [ArtType.PaperPrintWithTitlePlate]: "PAPER_PRINT_WITH_TITLE_PLATE",
+  [ArtType.CanvasFloatFrame]: "CANVAS_FLOAT_FRAME",
+  [ArtType.WallDecor]: "WALL_DECOR",
+  [ArtType.AcousticPanel]: "ACOUSTIC_PANEL",
+  [ArtType.AcousticPanelFramed]: "ACOUSTIC_PANEL_FRAMED",
+  [ArtType.MetalPrint]: "METAL_PRINT",
+  [ArtType.Mirror]: "MIRROR",
+  [ArtType.PatientBoard]: "PATIENT_BOARD",
+};
+
+// Same rationale as ART_TYPE_LABELS: the mapping lets the parser convert inbound strings to enums
+// and later turn enums back into strings when serialising results.
+const ART_MATERIAL_LABELS: Record<ArtMaterial, string> = {
+  [ArtMaterial.Glass]: "GLASS",
+  [ArtMaterial.Acrylic]: "ACRYLIC",
+  [ArtMaterial.CanvasFramed]: "CANVAS_FRAMED",
+  [ArtMaterial.CanvasGallery]: "CANVAS_GALLERY",
+  [ArtMaterial.Mirror]: "MIRROR",
+  [ArtMaterial.AcousticPanel]: "ACOUSTIC_PANEL",
+  [ArtMaterial.AcousticPanelFramed]: "ACOUSTIC_PANEL_FRAMED",
+  [ArtMaterial.PatientBoard]: "PATIENT_BOARD",
+  [ArtMaterial.NoGlazing]: "NO_GLAZING",
+  [ArtMaterial.Unknown]: "UNKNOWN",
+};
+
+export function getArtTypeLabel(type: ArtType): string {
+  return ART_TYPE_LABELS[type];
+}
+
+export function getArtMaterialLabel(material: ArtMaterial): string {
+  return ART_MATERIAL_LABELS[material];
 }
 
 export interface ArtCreationOptions {
@@ -49,7 +87,6 @@ export interface ArtCreationOptions {
   productType: ArtType;
   material: ArtMaterial;
   dimensions: Dimensions;
-  quantity?: number;
   specialHandlingFlags?: SpecialHandlingFlag[];
   description?: string;
   finalMediumLabel?: string;
@@ -67,13 +104,12 @@ export class Art {
   private readonly length: number;
   private readonly width: number;
   private readonly depth: number;
-  private readonly quantity: number;
   private readonly flags: Set<SpecialHandlingFlag>;
   private readonly description?: string;
   private readonly finalMediumLabel?: string;
   private readonly glazingLabel?: string;
   private readonly hardwareLabel?: string;
-  private readonly hardwarePiecesPerItem?: number;
+  private readonly hardwarePieces?: number;
 
 
   constructor(options: ArtCreationOptions) {
@@ -84,13 +120,12 @@ export class Art {
     this.width = options.dimensions.width;
     const depth = options.dimensions.height ?? DEFAULT_DEPTH_PADDING_INCHES;
     this.depth = depth;
-    this.quantity = options.quantity ?? 1;
     this.flags = new Set(options.specialHandlingFlags ?? []);
     this.description = options.description;
     this.finalMediumLabel = options.finalMediumLabel;
     this.glazingLabel = options.glazingLabel;
     this.hardwareLabel = options.hardwareLabel;
-    this.hardwarePiecesPerItem = options.hardwarePiecesPerItem;
+    this.hardwarePieces = options.hardwarePiecesPerItem;
   }
 
   public getId(): string {
@@ -109,33 +144,16 @@ export class Art {
     return this.productType;
   }
 
+  public getProductTypeLabel(): string {
+    return getArtTypeLabel(this.productType);
+  }
+
   public getMaterial(): ArtMaterial {
     return this.material;
   }
 
-  public getQuantity(): number {
-    return this.quantity;
-  }
-
-  public getFinalMediumLabel(): string | undefined {
-    return this.finalMediumLabel;
-  }
-
-  public getGlazingLabel(): string | undefined {
-    return this.glazingLabel;
-  }
-
-  public getHardwareLabel(): string | undefined {
-    return this.hardwareLabel;
-  }
-
-  public getHardwarePiecesPerItem(): number | undefined {
-    return this.hardwarePiecesPerItem;
-  }
-
-  public getHardwarePiecesTotal(): number {
-    const piecesPerItem = this.hardwarePiecesPerItem ?? 0;
-    return piecesPerItem * this.quantity;
+  public getMaterialLabel(): string {
+    return getArtMaterialLabel(this.material);
   }
 
   /**
