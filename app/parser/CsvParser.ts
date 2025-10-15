@@ -8,6 +8,7 @@ const HEADER_ALIASES: Record<string, string> = {
   "line number": "lineNumber",
   quantity: "quantity",
   "tag #": "tagNumber",
+  "tag number": "tagNumber",  // Accept both "tag #" and "tag number"
   "final medium": "finalMedium",
   "outside size width": "outsideWidth",
   "outside size height": "outsideHeight",

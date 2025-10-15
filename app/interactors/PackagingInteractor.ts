@@ -32,6 +32,46 @@ export interface ContainerPackingResult {
 const MAX_PALLET_HEIGHT_IN = 84;
 
 export class PackagingInteractor {
+  /**
+   * Splits an Art object with large quantity into smaller Art objects
+   * that can fit within box capacity limits
+   */
+  private splitArtByQuantity(art: Art, maxQuantity: number): Art[] {
+    const totalQuantity = art.getQuantity();
+    if (totalQuantity <= maxQuantity) {
+      return [art];
+    }
+
+    const splits: Art[] = [];
+    let remaining = totalQuantity;
+    let splitIndex = 0;
+
+    while (remaining > 0) {
+      const quantityForThisSplit = Math.min(remaining, maxQuantity);
+      
+      // Create a new Art object with the split quantity
+      const splitArt = new Art({
+        id: `${art.getId()}-split-${splitIndex}`,
+        productType: art.getProductType(),
+        material: art.getMaterial(),
+        dimensions: art.getRawDimensions(),
+        quantity: quantityForThisSplit,
+        specialHandlingFlags: art.getSpecialHandlingFlags(),
+        description: art.getDescription(),
+        finalMediumLabel: art.getFinalMediumLabel(),
+        glazingLabel: art.getGlazingLabel(),
+        hardwareLabel: art.getHardwareLabel(),
+        hardwarePiecesPerItem: art.getHardwarePiecesPerItem(),
+      });
+
+      splits.push(splitArt);
+      remaining -= quantityForThisSplit;
+      splitIndex++;
+    }
+
+    return splits;
+  }
+
   public packBoxes(artCollection: Art[]): BoxPackingResult {
     const boxes: Box[] = [];
     const unassignedArt: Art[] = [];
@@ -52,23 +92,64 @@ export class PackagingInteractor {
       }
 
       const preferredType = PackagingRules.requiresOversizeBox(art) ? BoxType.Large : BoxType.Standard;
+      
+      // Check if this art needs to be split due to quantity limits
+      // Try to add to existing box first
       let targetBox = this.findBoxForArt(boxes, art, preferredType);
-
-      if (!targetBox) {
-        targetBox = new Box({ type: preferredType });
-        if (!targetBox.canAccommodate(art) || !targetBox.addArt(art)) {
-          unassignedArt.push(art);
-          unassignedReasons[art.getId()] = "No available box could accommodate the dimensions";
-          continue;
+      
+      if (targetBox && targetBox.canAccommodate(art)) {
+        // Can fit in existing box
+        targetBox.addArt(art);
+        assignments.set(art.getId(), { art, box: targetBox });
+      } else {
+        // Need to create new box(es) - potentially split if quantity is too large
+        const tempBox = new Box({ type: preferredType });
+        
+        if (tempBox.canAccommodate(art)) {
+          // Fits in a single new box
+          tempBox.addArt(art);
+          boxes.push(tempBox);
+          assignments.set(art.getId(), { art, box: tempBox });
+        } else {
+          // Doesn't fit - need to split the art across multiple boxes
+          // This happens when quantity exceeds box capacity
+          
+          // Determine split size based on whether item requires oversize box
+          // Items that fit in standard boxes (one dimension ≤36") can have 6 per box
+          // Items that require oversize boxes (both dimensions >36") can have 3 per box
+          const requiresOversizeBox = PackagingRules.requiresOversizeBox(art);
+          const maxQuantity = requiresOversizeBox ? 3 : 6;
+          
+          const splits = this.splitArtByQuantity(art, maxQuantity);
+          
+          for (const splitArt of splits) {
+            let splitBox = this.findBoxForArt(boxes, splitArt, preferredType);
+            
+            if (!splitBox) {
+              splitBox = new Box({ type: preferredType });
+              if (!splitBox.canAccommodate(splitArt) || !splitBox.addArt(splitArt)) {
+                unassignedArt.push(splitArt);
+                unassignedReasons[splitArt.getId()] = "Cannot accommodate even after splitting";
+                continue;
+              }
+              boxes.push(splitBox);
+            } else {
+              if (!splitBox.addArt(splitArt)) {
+                // Existing box full, create new one
+                splitBox = new Box({ type: preferredType });
+                if (!splitBox.canAccommodate(splitArt) || !splitBox.addArt(splitArt)) {
+                  unassignedArt.push(splitArt);
+                  unassignedReasons[splitArt.getId()] = "Cannot accommodate even after splitting";
+                  continue;
+                }
+                boxes.push(splitBox);
+              }
+            }
+            
+            assignments.set(splitArt.getId(), { art: splitArt, box: splitBox });
+          }
         }
-        boxes.push(targetBox);
-      } else if (!targetBox.addArt(art)) {
-        unassignedArt.push(art);
-        unassignedReasons[art.getId()] = "Box capacity reached";
-        continue;
       }
-
-      assignments.set(art.getId(), { art, box: targetBox });
     }
 
     return {
@@ -83,25 +164,74 @@ export class PackagingInteractor {
     const containers: Crate[] = [];
     const unassignedBoxes: Box[] = [];
 
-    for (const box of boxes) {
-      const targetContainerType = this.selectContainerType(box, capabilities);
+    // Optimize pallet selection for standard boxes when pallets are accepted
+    if (capabilities.acceptsPallets && boxes.length > 0) {
+      // Count standard vs large boxes
+      const standardBoxes = boxes.filter(b => b.getType() === BoxType.Standard);
+      const largeBoxes = boxes.filter(b => b.getType() === BoxType.Large);
+      
+      // For standard boxes, choose optimal pallet configuration
+      if (standardBoxes.length > 0) {
+        const optimalPalletType = this.selectOptimalPalletType(standardBoxes.length);
+        
+        // Pack standard boxes into optimal pallets
+        for (const box of standardBoxes) {
+          let container = containers.find((crate) => 
+            crate.getType() === optimalPalletType && crate.canAccommodate(box)
+          );
 
-      if (!targetContainerType) {
-        unassignedBoxes.push(box);
-        continue;
+          if (!container) {
+            container = new Crate({ type: optimalPalletType });
+            if (!container.canAccommodate(box) || !container.addBox(box)) {
+              unassignedBoxes.push(box);
+              continue;
+            }
+            containers.push(container);
+          } else if (!container.addBox(box)) {
+            unassignedBoxes.push(box);
+          }
+        }
       }
+      
+      // Pack large boxes into oversize pallets
+      for (const box of largeBoxes) {
+        let container = containers.find((crate) => 
+          crate.getType() === CrateType.OversizePallet && crate.canAccommodate(box)
+        );
 
-      let container = containers.find((crate) => crate.getType() === targetContainerType && crate.canAccommodate(box));
+        if (!container) {
+          container = new Crate({ type: CrateType.OversizePallet });
+          if (!container.canAccommodate(box) || !container.addBox(box)) {
+            unassignedBoxes.push(box);
+            continue;
+          }
+          containers.push(container);
+        } else if (!container.addBox(box)) {
+          unassignedBoxes.push(box);
+        }
+      }
+    } else {
+      // Original logic for crates or when pallets not accepted
+      for (const box of boxes) {
+        const targetContainerType = this.selectContainerType(box, capabilities);
 
-      if (!container) {
-        container = new Crate({ type: targetContainerType });
-        if (!container.canAccommodate(box) || !container.addBox(box)) {
+        if (!targetContainerType) {
           unassignedBoxes.push(box);
           continue;
         }
-        containers.push(container);
-      } else if (!container.addBox(box)) {
-        unassignedBoxes.push(box);
+
+        let container = containers.find((crate) => crate.getType() === targetContainerType && crate.canAccommodate(box));
+
+        if (!container) {
+          container = new Crate({ type: targetContainerType });
+          if (!container.canAccommodate(box) || !container.addBox(box)) {
+            unassignedBoxes.push(box);
+            continue;
+          }
+          containers.push(container);
+        } else if (!container.addBox(box)) {
+          unassignedBoxes.push(box);
+        }
       }
     }
 
@@ -155,6 +285,28 @@ export class PackagingInteractor {
     return undefined;
   }
 
+  /**
+   * Selects the optimal pallet type for a given number of standard boxes
+   * Compares standard pallets (4 boxes, 60 lbs) vs oversize pallets (5 boxes, 75 lbs)
+   * and chooses the option with lower total weight
+   */
+  private selectOptimalPalletType(boxCount: number): CrateType {
+    // Calculate pallets needed for each option
+    const standardPalletsNeeded = Math.ceil(boxCount / 4);
+    const oversizePalletsNeeded = Math.ceil(boxCount / 5);
+    
+    // Calculate total weight for each option
+    const standardPalletWeight = standardPalletsNeeded * 60;
+    const oversizePalletWeight = oversizePalletsNeeded * 75;
+    
+    // Choose the option with lower total weight
+    // If equal, prefer standard (more common)
+    if (oversizePalletWeight < standardPalletWeight) {
+      return CrateType.OversizePallet;
+    }
+    return CrateType.StandardPallet;
+  }
+
   private selectContainerType(box: Box, capabilities: DeliveryCapabilities): CrateType | null {
     const prefersPallets = capabilities.acceptsPallets;
     const prefersCrates = capabilities.acceptsCrates;
@@ -180,7 +332,7 @@ export class PackagingInteractor {
       .filter((art) => art.getMaterial() === ArtMaterial.Glass)
       .reduce((sum, art) => sum + WeightCalculator.calculateWeight(art), 0);
     const oversizedWeight = artItems
-      .filter((art) => PackagingRules.requiresOversizeBox(art))
+      .filter((art) => PackagingRules.isOversized(art))
       .reduce((sum, art) => sum + WeightCalculator.calculateWeight(art), 0);
 
     const pallets = containerResult.containers.filter((container) => container.getContainerKind() === ContainerKind.Pallet);
