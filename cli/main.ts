@@ -21,7 +21,7 @@ import type { PackagingRequest } from "../app/requests/PackagingRequest";
 /**
  * Normalizes human-friendly boolean strings (yes/no, true/false, etc.) into actual booleans.
  */
-function parseBoolean(value: string, label: string): boolean {
+export function parseBoolean(value: string, label: string): boolean {
   const normalized = value.trim().toLowerCase();
 
   if (["y", "yes", "true", "1"].includes(normalized)) {
@@ -37,7 +37,7 @@ function parseBoolean(value: string, label: string): boolean {
   );
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const [
     csvFilePath,
     clientName,
