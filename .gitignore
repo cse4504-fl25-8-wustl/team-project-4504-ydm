@@ -90,3 +90,8 @@ temp/
 # Sample data files (optional - uncomment if you don't want to track sample CSVs)
 # sample*.csv
 # test*.csv
+
+input1.csv
+Site_requirements.csv
+Input1_test_plan.md
+Input1_test_plan.pdf
