@@ -1,0 +1,47 @@
+name: vitest
+
+on:
+  # 1. Manual trigger
+  workflow_dispatch:
+  
+  # 2. When a pull request is approved for merging to main
+  pull_request_review:
+    types: [submitted]
+    branches:
+      - main
+  
+  # 3. When anything is pushed to main
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      github.event_name == 'push' || 
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved')    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'  # Adjust to your project's Node version
+          cache: 'npm'  # Speeds up installation by caching dependencies
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npx vitest run
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: test-report/
+          retention-days: 30
