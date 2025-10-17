@@ -62,9 +62,9 @@ const CRATE_SPECIFICATIONS: Record<CrateType, CrateSpecification> = {
     type: CrateType.OversizePallet,
     containerKind: ContainerKind.Pallet,
     tareWeight: 75,
-    maxBoxes: 6,
+    maxBoxes: 5,
     allowedBoxTypes: [BoxType.Standard, BoxType.Large],
-    notes: "60x40 pallet; holds up to six standard or mixed oversized boxes.",
+    notes: "60x40 pallet; holds up to five standard or mixed oversized boxes.",
   },
 };
 

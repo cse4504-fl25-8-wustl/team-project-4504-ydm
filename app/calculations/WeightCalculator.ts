@@ -21,6 +21,9 @@ export class WeightCalculator {
   /**
    * Calculates the weight of an art piece
    * Throws error for unknown materials instead of silently defaulting to 0
+   * 
+   * IMPORTANT: Weight is rounded up at the INDIVIDUAL PIECE level, then multiplied by quantity.
+   * This ensures conservative estimates as per requirements.
    */
   public static calculateWeight(art: Art): number {
     const material = art.getMaterial();
@@ -37,9 +40,15 @@ export class WeightCalculator {
 
     const dims = art.getDimensions();
     const surfaceArea = dims.length * dims.width;
-    const rawWeight = surfaceArea * weightFactor * art.getQuantity();
     
-    return this.roundUpWeight(rawWeight);
+    // Calculate weight per individual piece
+    const weightPerPiece = surfaceArea * weightFactor;
+    
+    // Round up at the individual piece level (conservative approach)
+    const roundedWeightPerPiece = this.roundUpWeight(weightPerPiece);
+    
+    // Multiply by quantity AFTER rounding
+    return roundedWeightPerPiece * art.getQuantity();
   }
 
   /**

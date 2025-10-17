@@ -198,7 +198,9 @@ export class Box {
       return false;
     }
 
-    if (PackagingRules.isOversized(art)) {
+    // Only apply oversized piece limit if item requires oversize box (both dimensions >36")
+    // Items with one dimension ≤36" fit in standard boxes and use regular capacity limits
+    if (PackagingRules.requiresOversizeBox(art)) {
       if (this.oversizedPieces + quantity > this.rules.maxOversizedPieces) {
         return false;
       }
@@ -225,7 +227,8 @@ export class Box {
 
     this.totalPieces += quantity;
 
-    if (PackagingRules.isOversized(art)) {
+    // Only count as oversized if it requires oversize box (both dimensions >36")
+    if (PackagingRules.requiresOversizeBox(art)) {
       this.oversizedPieces += quantity;
     }
 
