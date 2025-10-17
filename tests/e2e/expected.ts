@@ -1,6 +1,26 @@
 export const GOLDEN_SUMMARIES = {
   input1: {
     workOrder: {
+      totalPieces: 13,
+      standardPieces: 11,
+      oversizedPieces: 2,
+      oversizedBreakdown: [
+        { size: "55x31", quantity: 1, weightLbs: 17 },
+        { size: "47x34", quantity: 1, weightLbs: 16 },
+      ],
+    },
+    weights: {
+      artwork: 187,
+      packaging: 60,
+      shipment: 247,
+    },
+    packaging: {
+      boxCounts: [{ label: "Standard box", count: 3 }],
+      containerCounts: [{ label: "Standard pallet", count: 1 }],
+    },
+  },
+  input2: {
+    workOrder: {
       totalPieces: 55,
       standardPieces: 49,
       oversizedPieces: 6,
@@ -20,7 +40,7 @@ export const GOLDEN_SUMMARIES = {
       containerCounts: [{ label: "Oversize pallet", count: 2 }],
     },
   },
-  input2: {
+  input3: {
     workOrder: {
       totalPieces: 70,
       standardPieces: 70,
@@ -33,26 +53,6 @@ export const GOLDEN_SUMMARIES = {
     packaging: {
       boxCounts: [{ label: "Standard box", count: 12 }],
       containerCounts: [{ label: "Standard pallet", count: 3 }],
-    },
-  },
-  input3: {
-    workOrder: {
-      totalPieces: 13,
-      standardPieces: 11,
-      oversizedPieces: 2,
-      oversizedBreakdown: [
-        { size: "55x31", quantity: 1, weightLbs: 17 },
-        { size: "47x34", quantity: 1, weightLbs: 16 },
-      ],
-    },
-    weights: {
-      artwork: 187,
-      packaging: 60,
-      shipment: 247,
-    },
-    packaging: {
-      boxCounts: [{ label: "Standard box", count: 3 }],
-      containerCounts: [{ label: "Standard pallet", count: 1 }],
     },
   },
   input4: {

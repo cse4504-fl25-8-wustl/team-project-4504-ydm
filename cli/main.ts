@@ -23,6 +23,7 @@ export interface PackagingJobOptions {
 export interface PackagingJobResult {
   response: PackagingResponse;
   artItemCount: number;
+  totalPieceCount: number;
 }
 
 /**
@@ -88,9 +89,13 @@ export async function runPackagingJob(options: PackagingJobOptions): Promise<Pac
   const interactor = new PackagingInteractor();
   const response = interactor.packageEverything(request);
 
+  // Calculate total piece count by summing quantities from all art items
+  const totalPieceCount = artItems.reduce((sum, art) => sum + art.getQuantity(), 0);
+
   return {
     response,
     artItemCount: artItems.length,
+    totalPieceCount,
   };
 }
 

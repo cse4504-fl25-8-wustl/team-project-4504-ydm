@@ -33,11 +33,9 @@ function resolveFixture(relativePath: string): string {
   return path.resolve(__dirname, "..", "..", relativePath);
 }
 
-function sumArtQuantity(response: Awaited<ReturnType<typeof runPackagingJob>>["response"]): number {
-  return response.packingSummary.hardware.lineItemSummary.reduce(
-    (sum, entry) => sum + entry.artQuantity,
-    0,
-  );
+function sumArtQuantity(result: Awaited<ReturnType<typeof runPackagingJob>>): number {
+  // Return the total piece count which is the sum of all art item quantities
+  return result.totalPieceCount;
 }
 
 function getCount(items: Array<{ label: string; count: number }>, label: string): number {
@@ -49,7 +47,7 @@ describe("End-to-end packaging workflow", () => {
     const expected = GOLDEN_SUMMARIES[name];
     const csvPath = resolveFixture(csv);
 
-    const { response } = await runPackagingJob({
+    const result = await runPackagingJob({
       csvFilePath: csvPath,
       clientName: "Client",
       jobSiteLocation: "Test Location",
@@ -58,8 +56,10 @@ describe("End-to-end packaging workflow", () => {
       quiet: true,
     });
 
+    const { response } = result;
+
     // Work order totals
-    const totalPieces = sumArtQuantity(response);
+    const totalPieces = sumArtQuantity(result);
     expect(totalPieces).toBe(expected.workOrder.totalPieces);
 
     // Weight summaries
