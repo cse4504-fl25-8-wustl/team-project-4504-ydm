@@ -24,6 +24,14 @@ const originalExit = process.exit
 const originalConsoleError = console.error
 const originalConsoleLog = console.log
 
+const createSampleArt = () => new Art({
+  id: 'sample',
+  productType: ArtType.PaperPrint,
+  material: ArtMaterial.Glass,
+  dimensions: { length: 30, width: 20 },
+  quantity: 1
+})
+
 describe('CLI Main', () => {
   const mockExistsSync = vi.mocked(existsSync)
   const mockParse = vi.mocked(parse)
@@ -150,8 +158,8 @@ describe('CLI Main', () => {
       await runMainWithArgs(validArgs)
       
       expect(mockExit).toHaveBeenCalledWith(1)
-      expect(consoleErrorSpy).toHaveBeenCalledWith('CSV file validation failed:')
-      expect(consoleErrorSpy).toHaveBeenCalledWith('  - Missing required columns: lineNumber, quantity')
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('CSV file validation failed:'))
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Missing required columns: lineNumber, quantity'))
     })
 
     it('should exit with error when CSV structure validation throws', async () => {
@@ -162,7 +170,7 @@ describe('CLI Main', () => {
       
       expect(mockExit).toHaveBeenCalledWith(1)
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error validating CSV file: File read error')
+        expect.stringContaining('File read error')
       )
     })
 
@@ -175,7 +183,7 @@ describe('CLI Main', () => {
       
       expect(mockExit).toHaveBeenCalledWith(1)
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error: No valid art items found in CSV file.'
+        expect.stringContaining('No valid art items found in CSV file')
       )
     })
 
@@ -188,7 +196,7 @@ describe('CLI Main', () => {
       
       expect(mockExit).toHaveBeenCalledWith(1)
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error parsing CSV file: Parsing failed'
+        expect.stringContaining('Parsing failed')
       )
     })
 
@@ -329,7 +337,7 @@ describe('CLI Main', () => {
       for (const { args, expected } of testCases) {
         mockExistsSync.mockReturnValue(true)
         mockValidateCsvStructure.mockResolvedValue({ isValid: true, headers: [], errors: [] })
-        mockParse.mockResolvedValue([])
+        mockParse.mockResolvedValue([createSampleArt()])
         
         const mockInstance = {
           packageEverything: vi.fn().mockReturnValue({ success: true })
@@ -338,13 +346,8 @@ describe('CLI Main', () => {
         
         await runMainWithArgs(args)
         
-        expect(mockInstance.packageEverything).toHaveBeenCalledWith({
-          artItems: [],
-          clientName: 'Client',
-          jobSiteLocation: 'Location',
-          serviceType: 'Service',
-          deliveryCapabilities: expected
-        })
+        const callArgs = mockInstance.packageEverything.mock.calls[0][0]
+        expect(callArgs.deliveryCapabilities).toEqual(expected)
       }
     })
 
@@ -373,7 +376,7 @@ describe('CLI Main', () => {
 
       mockExistsSync.mockReturnValue(true)
       mockValidateCsvStructure.mockResolvedValue({ isValid: true, headers: [], errors: [] })
-      mockParse.mockResolvedValue([])
+      mockParse.mockResolvedValue([createSampleArt()])
       
       const mockInstance = {
         packageEverything: vi.fn().mockReturnValue({ success: true })
@@ -382,18 +385,16 @@ describe('CLI Main', () => {
       
       await runMainWithArgs(args)
       
-      expect(mockInstance.packageEverything).toHaveBeenCalledWith({
-        artItems: [],
-        clientName: 'My Client',
-        jobSiteLocation: '123 Main St',
-        serviceType: 'Standard Service',
-        deliveryCapabilities: {
-          acceptsPallets: true,
-          acceptsCrates: false,
-          hasLoadingDock: true,
-          requiresLiftgate: false,
-          needsInsideDelivery: true
-        }
+      const callArgs = mockInstance.packageEverything.mock.calls[0][0]
+      expect(callArgs.clientName).toBe('My Client')
+      expect(callArgs.jobSiteLocation).toBe('123 Main St')
+      expect(callArgs.serviceType).toBe('Standard Service')
+      expect(callArgs.deliveryCapabilities).toEqual({
+        acceptsPallets: true,
+        acceptsCrates: false,
+        hasLoadingDock: true,
+        requiresLiftgate: false,
+        needsInsideDelivery: true
       })
     })
 
@@ -412,7 +413,7 @@ describe('CLI Main', () => {
 
       mockExistsSync.mockReturnValue(true)
       mockValidateCsvStructure.mockResolvedValue({ isValid: true, headers: [], errors: [] })
-      mockParse.mockResolvedValue([])
+      mockParse.mockResolvedValue([createSampleArt()])
       
       const mockInstance = {
         packageEverything: vi.fn().mockReturnValue({ success: true })
@@ -421,18 +422,16 @@ describe('CLI Main', () => {
       
       await runMainWithArgs(args)
       
-      expect(mockInstance.packageEverything).toHaveBeenCalledWith({
-        artItems: [],
-        clientName: 'Client & Co.',
-        jobSiteLocation: '123 Main St, Suite 100',
-        serviceType: 'Premium Service',
-        deliveryCapabilities: {
-          acceptsPallets: true,
-          acceptsCrates: false,
-          hasLoadingDock: true,
-          requiresLiftgate: false,
-          needsInsideDelivery: true
-        }
+      const callArgs = mockInstance.packageEverything.mock.calls[0][0]
+      expect(callArgs.clientName).toBe('Client & Co.')
+      expect(callArgs.jobSiteLocation).toBe('123 Main St, Suite 100')
+      expect(callArgs.serviceType).toBe('Premium Service')
+      expect(callArgs.deliveryCapabilities).toEqual({
+        acceptsPallets: true,
+        acceptsCrates: false,
+        hasLoadingDock: true,
+        requiresLiftgate: false,
+        needsInsideDelivery: true
       })
     })
   })

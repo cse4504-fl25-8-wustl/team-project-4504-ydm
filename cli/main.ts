@@ -1,23 +1,30 @@
 import process from "node:process";
 import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { parse, validateCsvStructure } from "../app/parser/CsvParser";
 import { PackagingInteractor } from "../app/interactors/PackagingInteractor";
-import type { PackagingRequest } from "../app/requests/PackagingRequest";
+import type { PackagingRequest, DeliveryCapabilities } from "../app/requests/PackagingRequest";
+import type { PackagingResponse } from "../app/responses/PackagingResponse";
 
-/**
- * Entry point for the command-line workflow. Implementers must:
- * 1. Read the CSV file path and site metadata flags from argv (already parsed below).
- * 2. Delegate CSV parsing to app/parser/CsvParser.parse without duplicating parsing logic here.
- * 3. Translate parsed rows into real Art entities once the parser supplies full data.
- * 4. Construct a PackagingRequest that mirrors the schema in app/requests.
- * 5. Invoke PackagingInteractor.packageEverything and print the PackagingResponse as JSON.
- *    The current JSON.stringify call is the required output format.
- * 6. Surface user-facing errors (bad arguments, missing files, parse failures) via stderr
- *    and exit with a non-zero status. The success path must exit with code 0.
- * Extending arguments (e.g., accepting defaults from config) should happen above the
- * PackagingRequest construction while keeping the rest of the flow intact.
- */
+export interface PackagingJobOptions {
+  csvFilePath: string;
+  clientName: string;
+  jobSiteLocation: string;
+  serviceType: string;
+  deliveryCapabilities: DeliveryCapabilities;
+  /**
+   * When true, suppresses non-critical log output (useful for automated tests).
+   */
+  quiet?: boolean;
+}
+
+export interface PackagingJobResult {
+  response: PackagingResponse;
+  artItemCount: number;
+}
+
 /**
  * Normalizes human-friendly boolean strings (yes/no, true/false, etc.) into actual booleans.
  */
@@ -35,6 +42,56 @@ export function parseBoolean(value: string, label: string): boolean {
   throw new Error(
     `Invalid ${label} value: "${value}". Accepted values: yes/no, true/false, y/n, 1/0.`,
   );
+}
+
+/**
+ * Shared implementation used by both the CLI entry point and automated tests.
+ * Loads art items from CSV, runs the packaging workflow, and returns the response.
+ */
+export async function runPackagingJob(options: PackagingJobOptions): Promise<PackagingJobResult> {
+  const {
+    csvFilePath,
+    clientName,
+    jobSiteLocation,
+    serviceType,
+    deliveryCapabilities,
+    quiet = false,
+  } = options;
+
+  if (!existsSync(csvFilePath)) {
+    throw new Error(`CSV file '${csvFilePath}' does not exist.`);
+  }
+
+  const structureValidation = await validateCsvStructure(csvFilePath);
+  if (!structureValidation.isValid) {
+    const errorMessages = structureValidation.errors.join("\n");
+    throw new Error(`CSV file validation failed:\n${errorMessages}`);
+  }
+
+  const artItems = await parse(csvFilePath);
+  if (artItems.length === 0) {
+    throw new Error("No valid art items found in CSV file.");
+  }
+
+  if (!quiet) {
+    console.error(`Successfully parsed ${artItems.length} art items from CSV.`);
+  }
+
+  const request: PackagingRequest = {
+    artItems,
+    clientName,
+    jobSiteLocation,
+    serviceType,
+    deliveryCapabilities,
+  };
+
+  const interactor = new PackagingInteractor();
+  const response = interactor.packageEverything(request);
+
+  return {
+    response,
+    artItemCount: artItems.length,
+  };
 }
 
 export async function main(): Promise<void> {
@@ -88,56 +145,27 @@ export async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Validate CSV file exists and structure
-  if (!existsSync(csvFilePath)) {
-    console.error(`Error: CSV file '${csvFilePath}' does not exist.`);
-    process.exit(1);
-  }
-
-  // Validate CSV structure before parsing
   try {
-    const structureValidation = await validateCsvStructure(csvFilePath);
-    if (!structureValidation.isValid) {
-      console.error("CSV file validation failed:");
-      structureValidation.errors.forEach(error => console.error(`  - ${error}`));
-      process.exit(1);
-    }
+    const { response } = await runPackagingJob({
+      csvFilePath,
+      clientName,
+      jobSiteLocation,
+      serviceType,
+      deliveryCapabilities,
+    });
+
+    console.log(JSON.stringify(response, null, 2));
   } catch (error) {
-    console.error(`Error validating CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(error instanceof Error ? error.message : "Unknown error");
     process.exit(1);
   }
-
-  // Parse CSV file into Art entities
-  let artItems;
-  try {
-    artItems = await parse(csvFilePath);
-    
-    if (artItems.length === 0) {
-      console.error("Error: No valid art items found in CSV file.");
-      process.exit(1);
-    }
-    
-    console.error(`Successfully parsed ${artItems.length} art items from CSV.`);
-  } catch (error) {
-    console.error(`Error parsing CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    process.exit(1);
-  }
-
-  const request: PackagingRequest = {
-    artItems,
-    clientName,
-    jobSiteLocation,
-    serviceType,
-    deliveryCapabilities,
-  };
-
-  const interactor = new PackagingInteractor();
-  const response = interactor.packageEverything(request);
-
-  console.log(JSON.stringify(response, null, 2));
 }
 
-main().catch((error) => {
-  console.error("Failed to run packaging workflow:", error);
-  process.exit(1);
-});
+const moduleFilename = fileURLToPath(import.meta.url);
+
+if (process.argv[1] && path.resolve(process.argv[1]) === moduleFilename) {
+  main().catch((error) => {
+    console.error("Failed to run packaging workflow:", error);
+    process.exit(1);
+  });
+}
