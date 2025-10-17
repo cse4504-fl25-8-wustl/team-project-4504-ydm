@@ -7,6 +7,7 @@ import { parse, validateCsvStructure } from "../app/parser/CsvParser";
 import { PackagingInteractor } from "../app/interactors/PackagingInteractor";
 import type { PackagingRequest, DeliveryCapabilities } from "../app/requests/PackagingRequest";
 import type { PackagingResponse } from "../app/responses/PackagingResponse";
+import { TextFormatter } from "../app/formatters/TextFormatter";
 
 export interface PackagingJobOptions {
   csvFilePath: string;
@@ -159,7 +160,8 @@ export async function main(): Promise<void> {
       deliveryCapabilities,
     });
 
-    console.log(JSON.stringify(response, null, 2));
+    // Output in human-readable text format as specified by client
+    console.log(TextFormatter.formatResponse(response));
   } catch (error) {
     console.error(error instanceof Error ? error.message : "Unknown error");
     process.exit(1);

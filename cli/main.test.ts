@@ -213,9 +213,23 @@ describe('CLI Main', () => {
       ]
       
       const mockResponse = {
-        success: true,
-        packages: [],
-        totalItems: 1
+        workOrderSummary: {
+          totalPieces: 1,
+          standardSizePieces: 1,
+          oversizedPieces: 0,
+          oversizedDetails: []
+        },
+        weightSummary: {
+          totalArtworkWeightLbs: 10,
+          glassFramedWeightLbs: 10,
+          oversizedWeightLbs: 0,
+          packagingWeightLbs: { total: 60, pallets: { count: 1, totalWeight: 60 }, crates: { count: 0, totalWeight: 0 } },
+          finalShipmentWeightLbs: 70
+        },
+        packingSummary: { boxRequirements: [], containerRequirements: [], packedContainerDimensions: [], hardware: { lineItemSummary: [], totalsByHardwareType: {}, totalPieces: 0 } },
+        businessIntelligence: { clientRulesApplied: [], oversizedItems: [], mediumsToFlag: [], alternativeRecommendations: [], riskFlags: [] },
+        freightExport: { subject: '', shipmentDetails: [] },
+        metadata: { warnings: [], errors: [], algorithmUsed: 'test', processingTimeMs: 0, timestamp: '' }
       }
 
       mockExistsSync.mockReturnValue(true)
@@ -243,7 +257,12 @@ describe('CLI Main', () => {
         }
       })
       
-      expect(consoleLogSpy).toHaveBeenCalledWith(JSON.stringify(mockResponse, null, 2))
+      // Expect text format output, not JSON
+      expect(consoleLogSpy).toHaveBeenCalled()
+      const output = consoleLogSpy.mock.calls[0][0]
+      expect(output).toContain('Work Order Summary:')
+      expect(output).toContain('Total Pieces: 1')
+      expect(output).toContain('Total Artwork Weight: 10 lbs')
       expect(consoleErrorSpy).toHaveBeenCalledWith('Successfully parsed 1 art items from CSV.')
       expect(mockExit).not.toHaveBeenCalled()
     })
