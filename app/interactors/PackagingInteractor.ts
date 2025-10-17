@@ -15,6 +15,8 @@ import {
   ContainerRequirementSummary,
   PackedContainerDimension,
   OversizedItemFlag,
+  WorkOrderSummary,
+  OversizedPieceDetail,
 } from "../responses/PackagingResponse";
 
 export interface BoxPackingResult {
@@ -247,6 +249,7 @@ export class PackagingInteractor {
     const boxResult = this.packBoxes(request.artItems);
     const containerResult = this.packContainers(boxResult.boxes, request.deliveryCapabilities);
 
+    const workOrderSummary = this.buildWorkOrderSummary(request.artItems);
     const weightSummary = this.buildWeightSummary(request.artItems, containerResult);
     const packingSummary = this.buildPackingSummary(boxResult, containerResult);
     const businessIntelligence = this.buildBusinessIntelligence(request, boxResult);
@@ -261,6 +264,7 @@ export class PackagingInteractor {
     };
 
     return {
+      workOrderSummary,
       weightSummary,
       packingSummary,
       businessIntelligence,
@@ -324,6 +328,61 @@ export class PackagingInteractor {
     }
 
     return null;
+  }
+
+  private buildWorkOrderSummary(artItems: Art[]): WorkOrderSummary {
+    // Calculate total pieces
+    const totalPieces = artItems.reduce((sum, art) => sum + art.getQuantity(), 0);
+    
+    // Separate standard and oversized pieces
+    let standardSizePieces = 0;
+    let oversizedPieces = 0;
+    const oversizedMap = new Map<string, { quantity: number; weightLbs: number }>();
+    
+    for (const art of artItems) {
+      const quantity = art.getQuantity();
+      const isOversized = PackagingRules.isOversized(art);
+      
+      if (isOversized) {
+        oversizedPieces += quantity;
+        
+        // Group by dimensions
+        const dims = art.getDimensions();
+        const longSide = Math.max(dims.length, dims.width);
+        const shortSide = Math.min(dims.length, dims.width);
+        const dimKey = `${longSide}" x ${shortSide}"`;
+        
+        const existing = oversizedMap.get(dimKey);
+        const weight = WeightCalculator.calculateWeight(art);
+        
+        if (existing) {
+          oversizedMap.set(dimKey, {
+            quantity: existing.quantity + quantity,
+            weightLbs: existing.weightLbs + weight
+          });
+        } else {
+          oversizedMap.set(dimKey, { quantity, weightLbs: weight });
+        }
+      } else {
+        standardSizePieces += quantity;
+      }
+    }
+    
+    // Build oversized details array
+    const oversizedDetails: OversizedPieceDetail[] = Array.from(oversizedMap.entries()).map(
+      ([dimensions, data]) => ({
+        dimensions,
+        quantity: data.quantity,
+        weightLbs: data.weightLbs
+      })
+    );
+    
+    return {
+      totalPieces,
+      standardSizePieces,
+      oversizedPieces,
+      oversizedDetails
+    };
   }
 
   private buildWeightSummary(artItems: Art[], containerResult: ContainerPackingResult): WeightSummary {

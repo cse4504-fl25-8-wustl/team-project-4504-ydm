@@ -53,6 +53,19 @@ export interface OversizedItemFlag {
   recommendation: string;
 }
 
+export interface OversizedPieceDetail {
+  dimensions: string;
+  quantity: number;
+  weightLbs: number;
+}
+
+export interface WorkOrderSummary {
+  totalPieces: number;
+  standardSizePieces: number;
+  oversizedPieces: number;
+  oversizedDetails: OversizedPieceDetail[];
+}
+
 export interface BusinessIntelligenceSummary {
   clientRulesApplied: string[];
   oversizedItems: OversizedItemFlag[];
@@ -75,6 +88,7 @@ export interface PackagingResponseMetadata {
 }
 
 export interface PackagingResponse {
+  workOrderSummary: WorkOrderSummary;
   weightSummary: WeightSummary;
   packingSummary: PackingSummary;
   businessIntelligence: BusinessIntelligenceSummary;

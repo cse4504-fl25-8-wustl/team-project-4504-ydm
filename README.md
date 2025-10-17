@@ -41,6 +41,10 @@ This project uses [Vitest](https://vitest.dev/) as the testing framework. The fo
   ```bash
   pnpm package test_art.csv "MedStar" "Chevy Chase, MD" "Delivery + Installation" yes yes no yes yes
   ```
+  For the end-to-end fixtures checked into `input*_test.csv`, you can invoke the CLI the same way, for example:
+  ```bash
+  pnpm package input1_test.csv "Client" "Location" "Delivery + Installation" yes no no no no
+  ```
 
 ## Module Ownership Checklist
 - **Input & Parsing Pipeline** (`cli/`, `app/parser/`, `app/requests/`)
@@ -80,6 +84,7 @@ This project uses [Vitest](https://vitest.dev/) as the testing framework. The fo
 - Unit tests are written using Vitest with TypeScript support
 - Tests cover entity classes, business logic, and utility functions
 - Example test file: `app/entities/Art.test.ts` demonstrates comprehensive testing of the Art entity
+- Run end-to-end test: `pnpm vitest tests/e2e/packageEverything.test.ts`
 
 ### Testing Responsibilities Distribution
 
