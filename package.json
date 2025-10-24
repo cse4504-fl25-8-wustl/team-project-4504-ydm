@@ -1,0 +1,35 @@
+{
+  "name": "team-project-4504-ydm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "package": "tsx cli/main.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "csv-parser": "^3.2.0",
+    "next": "15.5.3",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.17",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "@vitest/coverage-v8": "3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "eslint": "9.14.0",
+    "eslint-config-next": "15.5.3",
+    "tsx": "4.15.7",
+    "typescript": "5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
