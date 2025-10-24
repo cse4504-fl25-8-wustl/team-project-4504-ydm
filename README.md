@@ -34,9 +34,38 @@ This project uses [Vitest](https://vitest.dev/) as the testing framework. The fo
 ### Running the Application
 - Run the packaging workflow:
   ```bash
-  pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery>
+  pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery> [--json-output <output-file>]
   ```
   Boolean flags accept `yes/no`, `true/false`, `y/n`, or `1/0`.
+  
+- **Optional JSON Output:** Use the `--json-output` (or `-j`) flag to write results to a JSON file:
+  ```bash
+  pnpm package input.csv "Client" "Location" "Delivery" yes no no no no --json-output output.json
+  ```
+  The JSON output follows this schema:
+  ```json
+  {
+    "total_pieces": <number>,
+    "standard_size_pieces": <number>,
+    "oversized_pieces": [
+      {
+        "side1": <number>,
+        "side2": <number>,
+        "quantity": <number>
+      }
+    ],
+    "standard_box_count": <number>,
+    "large_box_count": <number>,
+    "custom_piece_count": <number>,
+    "standard_pallet_count": <number>,
+    "oversized_pallet_count": <number>,
+    "crate_count": <number>,
+    "total_artwork_weight": <number>,
+    "total_packaging_weight": <number>,
+    "final_shipment_weight": <number>
+  }
+  ```
+  
 - Example invocation (all dummy data for now):
   ```bash
   pnpm package test_art.csv "MedStar" "Chevy Chase, MD" "Delivery + Installation" yes yes no yes yes
