@@ -169,7 +169,7 @@ Feature 2 focuses on implementing compatibility with the test_cases repository f
 
 ### Team Responsibilities
 
-#### **Person 1** - Input Format Compatibility & Box Packing Tests
+#### **Yisu Wang** - Input Format Compatibility & Box Packing Tests
 **Responsibilities:**
 - Update CSV parser to handle test_cases repository input format
 - Ensure compatibility with varying CSV structures across test categories
@@ -181,7 +181,7 @@ Feature 2 focuses on implementing compatibility with the test_cases repository f
 - Debug and fix any parsing issues with edge cases
 - Ensure proper handling of dimension variations (X, X placeholders)
 
-#### **Person 2** - JSON Output & Crate Packing Tests
+#### **Martin Rivera** - JSON Output & Crate Packing Tests
 **Responsibilities:**
 - Implement JSON output functionality with optional file argument
 - Design and implement JSON output format matching test_cases expected_output.json structure
@@ -193,7 +193,7 @@ Feature 2 focuses on implementing compatibility with the test_cases repository f
 - Ensure JSON output includes all required fields (total_pieces, box counts, etc.)
 - Handle file I/O operations and error handling for JSON output
 
-#### **Person 3** - Test Integration & Pallet Packing Tests
+#### **Daniel Yan** - Test Integration & Pallet Packing Tests
 **Responsibilities:**
 - Set up automated test runner for test_cases repository
 - Create test harness to validate against expected_output.json files
