@@ -8,6 +8,8 @@ import { PackagingInteractor } from "../app/interactors/PackagingInteractor";
 import type { PackagingRequest, DeliveryCapabilities } from "../app/requests/PackagingRequest";
 import type { PackagingResponse } from "../app/responses/PackagingResponse";
 import { TextFormatter } from "../app/formatters/TextFormatter";
+import { JsonFormatter } from "../app/formatters/JsonFormatter";
+import { writeFile } from "node:fs/promises";
 
 export interface PackagingJobOptions {
   csvFilePath: string;
@@ -19,6 +21,10 @@ export interface PackagingJobOptions {
    * When true, suppresses non-critical log output (useful for automated tests).
    */
   quiet?: boolean;
+  /**
+   * Optional path to write JSON output file.
+   */
+  jsonOutputPath?: string;
 }
 
 export interface PackagingJobResult {
@@ -58,6 +64,7 @@ export async function runPackagingJob(options: PackagingJobOptions): Promise<Pac
     serviceType,
     deliveryCapabilities,
     quiet = false,
+    jsonOutputPath,
   } = options;
 
   if (!existsSync(csvFilePath)) {
@@ -93,6 +100,16 @@ export async function runPackagingJob(options: PackagingJobOptions): Promise<Pac
   // Calculate total piece count by summing quantities from all art items
   const totalPieceCount = artItems.reduce((sum, art) => sum + art.getQuantity(), 0);
 
+  // Write JSON output if path is specified
+  if (jsonOutputPath) {
+    const jsonOutput = JsonFormatter.toJsonOutput(response);
+    const jsonString = JsonFormatter.stringify(jsonOutput);
+    await writeFile(jsonOutputPath, jsonString, "utf-8");
+    if (!quiet) {
+      console.error(`JSON output written to: ${jsonOutputPath}`);
+    }
+  }
+
   return {
     response,
     artItemCount: artItems.length,
@@ -101,6 +118,17 @@ export async function runPackagingJob(options: PackagingJobOptions): Promise<Pac
 }
 
 export async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  
+  // Check for optional --json-output flag
+  let jsonOutputPath: string | undefined;
+  const jsonOutputIndex = args.findIndex(arg => arg === "--json-output" || arg === "-j");
+  if (jsonOutputIndex !== -1 && jsonOutputIndex + 1 < args.length) {
+    jsonOutputPath = args[jsonOutputIndex + 1];
+    // Remove the flag and its value from args
+    args.splice(jsonOutputIndex, 2);
+  }
+
   const [
     csvFilePath,
     clientName,
@@ -111,7 +139,7 @@ export async function main(): Promise<void> {
     hasLoadingDockRaw,
     requiresLiftgateRaw,
     needsInsideDeliveryRaw,
-  ] = process.argv.slice(2);
+  ] = args;
 
   // Basic usage guard to ensure all required arguments are provided.
   if (
@@ -126,7 +154,7 @@ export async function main(): Promise<void> {
     !needsInsideDeliveryRaw
   ) {
     console.error(
-      "Usage: pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery>",
+      "Usage: pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery> [--json-output <output-file>]",
     );
     process.exit(1);
   }
@@ -158,6 +186,7 @@ export async function main(): Promise<void> {
       jobSiteLocation,
       serviceType,
       deliveryCapabilities,
+      jsonOutputPath,
     });
 
     // Output in human-readable text format as specified by client
