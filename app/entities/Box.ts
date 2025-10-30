@@ -76,7 +76,7 @@ const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
   },
 };
 
-const DEFAULT_CANVAS_PIECES_PER_BOX = 6; // TODO: validate vs written instruction that cites 4 pieces per box.
+const DEFAULT_CANVAS_PIECES_PER_BOX = 4; // Canvas pieces (framed or gallery) can fit 4 per box per packing rules
 
 interface BoxRules {
   maxPiecesPerProduct: Partial<Record<ArtType, number>>;
