@@ -200,9 +200,23 @@ export class Box {
 
     // Only apply oversized piece limit if item requires oversize box (both dimensions >36")
     // Items with one dimension ≤36" fit in standard boxes and use regular capacity limits
+    // Note: If product has a specific limit (e.g., PaperPrint = 6), use that instead of oversized limit
+    // The oversized limit (3) only applies to products without specific limits
     if (PackagingRules.requiresOversizeBox(art)) {
-      if (this.oversizedPieces + quantity > this.rules.maxOversizedPieces) {
-        return false;
+      const productLimit = this.rules.maxPiecesPerProduct[type];
+      const oversizedLimit = this.rules.maxOversizedPieces;
+      
+      // If product has a specific limit that's higher than oversized limit, use product limit
+      // Otherwise, use the more restrictive limit (oversized limit)
+      if (productLimit !== undefined && productLimit >= oversizedLimit) {
+        // Product limit is higher or equal to oversized limit - don't check oversized limit
+        // The product limit check above (line 197-199) is sufficient
+        // This allows PaperPrint to fit 6 pieces even in oversized boxes
+      } else {
+        // No product-specific limit or product limit is lower - use oversized limit
+        if (this.oversizedPieces + quantity > oversizedLimit) {
+          return false;
+        }
       }
     }
 

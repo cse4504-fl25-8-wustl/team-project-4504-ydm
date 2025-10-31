@@ -47,8 +47,8 @@ const CRATE_SPECIFICATIONS: Record<CrateType, CrateSpecification> = {
     containerKind: ContainerKind.Pallet,
     tareWeight: 60,
     maxBoxes: 4,
-    allowedBoxTypes: [BoxType.Standard],
-    notes: "48x40 pallet with four standard boxes (rule of thumb).",
+    allowedBoxTypes: [BoxType.Standard, BoxType.Large],
+    notes: "48x40 pallet with four standard boxes or three large boxes (rule of thumb).",
   },
   [CrateType.GlassPallet]: {
     type: CrateType.GlassPallet,
@@ -104,7 +104,26 @@ export class Crate {
       return false;
     }
 
-    if (this.contents.length >= this.spec.maxBoxes) {
+    // Special handling for StandardPallet: large boxes fit 3 per pallet, standard boxes fit 4
+    // If pallet has any large boxes, max capacity is 3 (for mixed boxes)
+    // If adding a large box to a pallet with standard boxes, reduce capacity to 3
+    let maxCapacity = this.spec.maxBoxes;
+    const hasLargeBoxes = this.contents.some(b => b.getType() === BoxType.Large);
+    const willHaveLargeBoxes = hasLargeBoxes || box.getType() === BoxType.Large;
+    
+    if (this.spec.type === CrateType.StandardPallet && willHaveLargeBoxes) {
+      // If pallet has or will have large boxes, max capacity is 3 total boxes
+      maxCapacity = 3;
+      const largeBoxCount = this.contents.filter(b => b.getType() === BoxType.Large).length;
+      // Can't add more large boxes if already at capacity (3)
+      if (box.getType() === BoxType.Large && largeBoxCount >= 3) {
+        return false;
+      }
+      // Can't add any box if total capacity (3) would be exceeded
+      // This is checked below with contents.length >= maxCapacity
+    }
+
+    if (this.contents.length >= maxCapacity) {
       return false;
     }
 
