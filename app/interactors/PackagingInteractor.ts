@@ -166,37 +166,152 @@ export class PackagingInteractor {
     const containers: Crate[] = [];
     const unassignedBoxes: Box[] = [];
 
-    // Optimize pallet selection for standard boxes when pallets are accepted
+    // Optimize pallet selection when pallets are accepted
     if (capabilities.acceptsPallets && boxes.length > 0) {
       // Count standard vs large boxes
       const standardBoxes = boxes.filter(b => b.getType() === BoxType.Standard);
       const largeBoxes = boxes.filter(b => b.getType() === BoxType.Large);
       
-      // For standard boxes, choose optimal pallet configuration
-      if (standardBoxes.length > 0) {
-        const optimalPalletType = this.selectOptimalPalletType(standardBoxes.length);
+      // Packing strategy:
+      // - Large boxes: 3 per standard pallet, then use oversized pallets if needed
+      // - Standard boxes: 4 per standard pallet, 5 per oversized pallet
+      // - Mixed pallets (standard + large): max 3 boxes total on standard pallet
+      // - Prefer standard pallets for efficiency, use oversized only when needed
+      
+      // Sort boxes strategically:
+      // - For mixed scenarios: pack standard boxes first to reserve space for large boxes
+      // - For all-large or all-standard: pack in order (will naturally fill pallets)
+      // Strategy: if we have both types, pack standard boxes first so large boxes can fit into mixed pallets
+      const sortedBoxes = [...boxes].sort((a, b) => {
+        // If we have both types, standard boxes first (so large boxes can join them later)
+        if (standardBoxes.length > 0 && largeBoxes.length > 0) {
+          if (a.getType() === BoxType.Standard && b.getType() === BoxType.Large) return -1;
+          if (a.getType() === BoxType.Large && b.getType() === BoxType.Standard) return 1;
+        }
+        // Otherwise maintain original order
+        return 0;
+      });
+      
+      const packedBoxes = new Set<Box>();
+      
+      for (const box of sortedBoxes) {
+        if (packedBoxes.has(box)) {
+          continue;
+        }
         
-        // Pack standard boxes into optimal pallets
-        for (const box of standardBoxes) {
-          let container = containers.find((crate) => 
-            crate.getType() === optimalPalletType && crate.canAccommodate(box)
-          );
+        // Try to find an existing pallet with space
+        // Strategy: check all existing containers before creating new ones
+        // Priority: standard pallets first (for both box types), then oversized pallets
+        let container: Crate | undefined = undefined;
+        
+        // First pass: try to find standard pallets that can accommodate the box
+        // Check ALL existing containers before creating new ones
+        for (const crate of containers) {
+          if (crate.getType() === CrateType.StandardPallet && crate.canAccommodate(box)) {
+            container = crate;
+            break; // Found a standard pallet with space, use it
+          }
+        }
+        
+        // Second pass: if no standard pallet found, try oversized pallets
+        if (!container) {
+          for (const crate of containers) {
+            if (crate.getType() === CrateType.OversizePallet && crate.canAccommodate(box)) {
+              container = crate;
+              break; // Found an oversized pallet with space, use it
+            }
+          }
+        }
+        
+        // Double-check: if we found a container, verify it can still accommodate (defensive check)
+        if (container && !container.canAccommodate(box)) {
+          container = undefined; // Container can't accommodate, look for another or create new
+        }
 
-          if (!container) {
-            container = new Crate({ type: optimalPalletType });
-            if (!container.canAccommodate(box) || !container.addBox(box)) {
+        if (!container) {
+          // Need to create a new pallet
+          let newPalletType: CrateType;
+          
+          if (box.getType() === BoxType.Large) {
+            // Large boxes: prefer standard pallets (3 per pallet)
+            newPalletType = CrateType.StandardPallet;
+          } else {
+            // Standard boxes: choose optimal pallet type based on remaining standard boxes
+            // But if there are unpacked large boxes, prefer standard pallets to allow mixing
+            const unpackedStandardBoxes = standardBoxes.filter(b => !packedBoxes.has(b));
+            const unpackedLargeBoxes = largeBoxes.filter(b => !packedBoxes.has(b));
+            
+            if (unpackedLargeBoxes.length > 0) {
+              // Prefer standard pallets to allow mixing with large boxes
+              newPalletType = CrateType.StandardPallet;
+            } else {
+              // Use optimal pallet type based on weight for remaining standard boxes only
+              newPalletType = this.selectOptimalPalletType(unpackedStandardBoxes.length);
+            }
+          }
+          
+          container = new Crate({ type: newPalletType });
+          
+          // If new pallet can't accommodate, try alternative pallet type
+          if (!container.canAccommodate(box)) {
+            if (box.getType() === BoxType.Large && newPalletType === CrateType.StandardPallet) {
+              // Try oversized pallet for large box if standard pallet can't accommodate
+              container = new Crate({ type: CrateType.OversizePallet });
+            } else if (box.getType() === BoxType.Standard && newPalletType === CrateType.StandardPallet) {
+              // Try oversized pallet for standard box if standard pallet can't accommodate
+              container = new Crate({ type: CrateType.OversizePallet });
+            }
+          }
+          
+          // Try to add box to container
+          if (!container.canAccommodate(box) || !container.addBox(box)) {
+            unassignedBoxes.push(box);
+            continue;
+          }
+          
+          // Only add container if it's not already in the array
+          if (!containers.includes(container)) {
+            containers.push(container);
+          }
+        } else {
+          // Add box to existing container
+          // Note: canAccommodate was already checked, so addBox should succeed
+          // But if it fails (shouldn't happen), try to find another container or create new one
+          if (!container.addBox(box)) {
+            // This shouldn't happen if canAccommodate returned true, but handle gracefully
+            // Try to find another container or create a new one
+            container = undefined;
+            
+            // Try again with a new container
+            if (box.getType() === BoxType.Large) {
+              container = new Crate({ type: CrateType.StandardPallet });
+            } else {
+              const unpackedStandardBoxes = standardBoxes.filter(b => !packedBoxes.has(b));
+              const unpackedLargeBoxes = largeBoxes.filter(b => !packedBoxes.has(b));
+              
+              if (unpackedLargeBoxes.length > 0) {
+                container = new Crate({ type: CrateType.StandardPallet });
+              } else {
+                container = new Crate({ type: this.selectOptimalPalletType(unpackedStandardBoxes.length) });
+              }
+            }
+            
+            if (container.canAccommodate(box) && container.addBox(box)) {
+              if (!containers.includes(container)) {
+                containers.push(container);
+              }
+            } else {
               unassignedBoxes.push(box);
               continue;
             }
-            containers.push(container);
-          } else if (!container.addBox(box)) {
-            unassignedBoxes.push(box);
           }
         }
+        
+        packedBoxes.add(box);
       }
       
-      // Pack large boxes into oversize pallets
-      for (const box of largeBoxes) {
+      // Handle any remaining unassigned boxes (fallback to oversized pallets)
+      for (const box of unassignedBoxes) {
         let container = containers.find((crate) => 
           crate.getType() === CrateType.OversizePallet && crate.canAccommodate(box)
         );
@@ -204,12 +319,11 @@ export class PackagingInteractor {
         if (!container) {
           container = new Crate({ type: CrateType.OversizePallet });
           if (!container.canAccommodate(box) || !container.addBox(box)) {
-            unassignedBoxes.push(box);
             continue;
           }
           containers.push(container);
         } else if (!container.addBox(box)) {
-          unassignedBoxes.push(box);
+          // Still can't fit, leave unassigned
         }
       }
     } else {
@@ -293,6 +407,7 @@ export class PackagingInteractor {
    * Selects the optimal pallet type for a given number of standard boxes
    * Compares standard pallets (4 boxes, 60 lbs) vs oversize pallets (5 boxes, 75 lbs)
    * and chooses the option with lower total weight
+   * If weights are equal, prefers the option with fewer pallets
    */
   private selectOptimalPalletType(boxCount: number): CrateType {
     // Calculate pallets needed for each option
@@ -304,10 +419,19 @@ export class PackagingInteractor {
     const oversizePalletWeight = oversizePalletsNeeded * 75;
     
     // Choose the option with lower total weight
-    // If equal, prefer standard (more common)
     if (oversizePalletWeight < standardPalletWeight) {
       return CrateType.OversizePallet;
     }
+    if (standardPalletWeight < oversizePalletWeight) {
+      return CrateType.StandardPallet;
+    }
+    
+    // If weights are equal, prefer fewer pallets (oversize if it uses fewer)
+    if (oversizePalletsNeeded < standardPalletsNeeded) {
+      return CrateType.OversizePallet;
+    }
+    
+    // Default to standard (more common)
     return CrateType.StandardPallet;
   }
 
