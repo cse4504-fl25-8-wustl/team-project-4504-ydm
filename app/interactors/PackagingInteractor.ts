@@ -115,13 +115,37 @@ export class PackagingInteractor {
         } else {
           // Doesn't fit - need to split the art across multiple boxes
           // This happens when quantity exceeds box capacity
-          
-          // Determine split size based on whether item requires oversize box
-          // Items that fit in standard boxes (one dimension ≤36") can have 6 per box
-          // Items that require oversize boxes (both dimensions >36") can have 3 per box
+
+          // Determine split size based on art type and box rules
+          // Query the box for the maximum pieces per product type
           const requiresOversizeBox = PackagingRules.requiresOversizeBox(art);
-          const maxQuantity = requiresOversizeBox ? 3 : 6;
-          
+          let maxQuantity: number;
+
+          if (requiresOversizeBox) {
+            // Oversized pieces have a limit of 3 per box
+            maxQuantity = 3;
+          } else {
+            // For standard sizes, check the box's per-product-type limit
+            // Create a temporary box to query its rules
+            const tempBox2 = new Box({ type: preferredType });
+            const artType = art.getProductType();
+
+            // Try to get the type-specific limit from Box's internal rules
+            // Default to 6 if no specific limit is set
+            // Note: This is a workaround since Box doesn't expose maxPiecesPerProduct
+            // We use the nominal capacity as a proxy
+            maxQuantity = tempBox2.getNominalCapacity();
+
+            // Special handling for known product types with lower limits
+            if (artType === ArtType.CanvasFloatFrame ||
+                artType === ArtType.AcousticPanel ||
+                artType === ArtType.AcousticPanelFramed) {
+              maxQuantity = 4;
+            } else if (artType === ArtType.PatientBoard) {
+              maxQuantity = 2;
+            }
+          }
+
           const splits = this.splitArtByQuantity(art, maxQuantity);
           
           for (const splitArt of splits) {
