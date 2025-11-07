@@ -1,8 +1,9 @@
 {
   "name": "team-project-4504-ydm",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,7 +13,32 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron:build": "next build && electron-builder",
+    "electron:build:mac": "next build && electron-builder --mac",
+    "electron:build:win": "next build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.archdesign.freightcalculator",
+    "productName": "ARCH Freight Calculator",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "electron/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "electron/icon.ico"
+    }
   },
   "dependencies": {
     "csv-parser": "^3.2.0",
@@ -26,10 +52,14 @@
     "@types/react-dom": "19.1.9",
     "@vitest/coverage-v8": "3.2.4",
     "@vitest/ui": "^3.2.4",
+    "concurrently": "^9.1.2",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
     "eslint": "9.14.0",
     "eslint-config-next": "15.5.3",
     "tsx": "4.15.7",
     "typescript": "5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wait-on": "^8.0.1"
   }
 }

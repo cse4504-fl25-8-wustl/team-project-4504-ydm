@@ -53,11 +53,26 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
 **Note:** The script uses `pnpm package` to run test cases and uses Node.js for JSON comparison (with `jq` as fallback if available), making it work on Windows/WSL environments.
 
 ### Running the Application
+
+#### Command Line Interface (CLI)
 - Run the packaging workflow:
   ```bash
   pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery> [--json-output <output-file>]
   ```
   Boolean flags accept `yes/no`, `true/false`, `y/n`, or `1/0`.
+
+#### Graphical User Interface (GUI)
+- **Development mode** (with hot reload):
+  ```bash
+  pnpm dev
+  ```
+  Then open your browser to `http://localhost:3000/gui`
+
+- **Electron desktop app** (development):
+  ```bash
+  pnpm electron:dev
+  ```
+  This will start the Next.js dev server and launch the Electron window automatically.
   
 - **Optional JSON Output:** Use the `--json-output` (or `-j`) flag to write results to a JSON file:
   ```bash
@@ -96,6 +111,73 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
   pnpm package input1_test.csv "Client" "Location" "Delivery + Installation" yes no no no no
   ```
 
+### Building One-Click Executables
+
+#### Prerequisites
+- Node.js 20+
+- pnpm installed globally
+- For Mac builds: macOS with Xcode Command Line Tools
+- For Windows builds: Windows with Visual Studio Build Tools or run on Windows/WSL
+
+#### Building for macOS
+```bash
+# Using the build script
+./scripts/build-electron.sh mac
+
+# Or directly with pnpm
+pnpm electron:build:mac
+```
+
+This will create a `.dmg` installer in the `dist/` directory that users can double-click to install.
+
+#### Building for Windows
+```bash
+# Using the build script
+./scripts/build-electron.sh win
+
+# Or directly with pnpm
+pnpm electron:build:win
+```
+
+This will create an `.exe` installer in the `dist/` directory.
+
+#### Build Output
+- **macOS**: `dist/ARCH Freight Calculator-1.0.0.dmg`
+- **Windows**: `dist/ARCH Freight Calculator Setup 1.0.0.exe`
+
+#### Testing the Build Locally
+1. Install dependencies: `pnpm install`
+2. Build the application: `./scripts/build-electron.sh`
+3. The executable will be in the `dist/` directory
+4. On Mac: Open the `.dmg` and drag the app to Applications
+5. On Windows: Run the `.exe` installer
+
+**Note:** Icon files (`electron/icon.icns` for Mac and `electron/icon.ico` for Windows) need to be added for production builds. Placeholder files are currently in place.
+
+### Alpha Release Responsibilities
+
+#### Martin Rivera - GUI Development
+- **Graphical User Interface** (`app/gui/`, `app/api/`)
+  - Created minimal GUI with CSV upload functionality
+  - Implemented API route for backend processing
+  - Developed shared service layer to avoid CLI/GUI duplication
+  - Ensured GUI uses same dependencies as CLI (clean architecture)
+  - Verified no regression in existing CLI functionality
+
+#### Daniel Yan - Windows Build
+- **Windows Executable Build**
+  - Configure and test Windows build process locally
+  - Create Windows installer (.exe) using electron-builder
+  - Document Windows-specific build requirements
+  - Test one-click installation on Windows platform
+
+#### Yisu Wang - Mac Build
+- **macOS Executable Build**
+  - Configure and test macOS build process locally
+  - Create macOS installer (.dmg) using electron-builder
+  - Document macOS-specific build requirements (Xcode tools, etc.)
+  - Test one-click installation on macOS platform
+
 ## Module Ownership Checklist
 - **Input & Parsing Pipeline** (`cli/`, `app/parser/`, `app/requests/`)
   - Owner: @Daniel Yan
@@ -114,18 +196,38 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
   - Maintain response schema evolution as reporting needs change.
 
 ## Workflow Overview
-1. The CLI (`cli/main.ts`) parses command-line input, normalizes boolean flags, and invokes the CSV parser.
-2. `app/parser/CsvParser.ts` currently returns placeholder `Art` entities; it will later hydrate them from the provided CSV file.
+
+### Command Line Interface (CLI)
+1. The CLI (`cli/main.ts`) parses command-line input, normalizes boolean flags, and invokes the shared `PackagingService`.
+2. `PackagingService` validates the CSV file and parses art items using `app/parser/CsvParser.ts`.
 3. The resulting `PackagingRequest` aggregates art items, client metadata, and delivery capabilities, then reaches `PackagingInteractor`.
-4. `app/interactors/PackagingInteractor.ts` runs dummy packing functions that produce an empty `PackagingResponse` structure.
-5. The CLI prints the response as formatted JSON so downstream tooling or developers can inspect the output.
+4. `app/interactors/PackagingInteractor.ts` runs the packing algorithms and produces a `PackagingResponse` structure.
+5. The CLI prints the response as formatted text or JSON (if `--json-output` flag is used).
+
+### Graphical User Interface (GUI)
+1. The GUI (`app/gui/page.tsx`) presents a form for CSV upload and delivery configuration.
+2. On form submission, the GUI sends the data to the API route (`app/api/package/route.ts`).
+3. The API route saves the uploaded CSV to a temporary file and invokes the shared `PackagingService`.
+4. The `PackagingService` processes the request identically to the CLI workflow.
+5. The API returns the `PackagingResponse` as JSON, which the GUI displays in a user-friendly format.
+
+### Shared Service Layer
+Both CLI and GUI use the same `PackagingService` (`app/services/PackagingService.ts`) to avoid code duplication. This ensures:
+- Consistent business logic across delivery mechanisms
+- Single source of truth for packaging calculations
+- Easier testing and maintenance
 
 ## Project Structure Highlights
-- `app/entities` contains the domain entities with dummy implementations.
-- `app/interactors` defines the use-case orchestration.
-- `app/parser` isolates CSV parsing (currently a stub).
-- `app/requests` and `app/responses` host the DTOs that connect the CLI with the use cases.
-- `cli/main.ts` is the command-line entry point that wires parser, interactor, and response printing.
+- `app/entities` - Domain entities (`Art`, `Box`, `Crate`, etc.) with business logic
+- `app/interactors` - Use-case orchestration and packing algorithms
+- `app/parser` - CSV parsing and data validation
+- `app/services` - Shared service layer used by both CLI and GUI
+- `app/requests` and `app/responses` - DTOs for request/response data
+- `app/api` - Next.js API routes for GUI backend
+- `app/gui` - React-based graphical user interface
+- `cli/main.ts` - Command-line entry point
+- `electron/` - Electron configuration for desktop app
+- `scripts/` - Build and utility scripts
 
 ## Testing
 
