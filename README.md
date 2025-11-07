@@ -34,15 +34,23 @@ This project uses [Vitest](https://vitest.dev/) as the testing framework. The fo
 ### End-to-End Regression Suite
 In addition to unit tests we keep full-run fixtures so everyone can verify JSON output stays aligned with goldens.
 
-- The bash harness lives at `run_all_tests.sh`. It scans a directory for `**/input.csv`, runs `pnpm package … --json-output`, and diffs the result against the colocated `expected_output.json`, printing pass/fail counts at the end.
-- **Team-defined ambiguous cases** (MixedMediumSameSize, 6PerLarge7, 8PerLarge9) live under `test_inputs_and_outputs/box_packing/**`. These files already have concrete quantities plus expected JSON, so you can get a clean signal with:
+- **Run all tests** (box packing, pallet packing, and crate packing):
   ```bash
-  cd project
-  ./run_all_tests.sh test_inputs_and_outputs
+  ./run-all-tests.sh
+  ```
+  This script automatically runs all test types and provides a comprehensive summary.
+  
+- **Run specific test types** by specifying a directory:
+  ```bash
+  ./run-all-tests.sh test_inputs_and_outputs  # Box packing tests
+  ./run-all-tests.sh test_data/pallet        # Pallet packing tests
+  ./run-all-tests.sh test_cases/crate_packing # Crate packing tests
   ```
 - **Official `test_cases` repository**: the upstream copy still contains placeholder values (`X`, `Y`, `Z`, zeroed expected outputs). Before using the script against `../test_cases`, make sure every CSV/JSON pair has been filled out with real client data; otherwise the parser will continue to error out on unknown media/dimensions even though the application logic is correct.
   
 The script exits non‑zero when any case fails, making it CI-friendly once both data sets are fully populated.
+
+**Note:** The script uses `pnpm package` to run test cases and uses Node.js for JSON comparison (with `jq` as fallback if available), making it work on Windows/WSL environments.
 
 ### Running the Application
 - Run the packaging workflow:
