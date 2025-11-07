@@ -1,5 +1,5 @@
 import { Art, ArtMaterial, ArtType } from "../entities/Art";
-import { Box, BoxType } from "../entities/Box";
+import { Box, BoxType, getDefaultMaxPiecesPerProduct } from "../entities/Box";
 import { Crate, CrateType, ContainerKind } from "../entities/Crate";
 import { DeliveryCapabilities, PackagingRequest } from "../requests/PackagingRequest";
 import { PackagingRules } from "../rules/PackagingRules";
@@ -32,6 +32,7 @@ export interface ContainerPackingResult {
 }
 
 const MAX_PALLET_HEIGHT_IN = 84;
+const OVERSIZE_PIECES_PER_BOX = 3;
 
 export class PackagingInteractor {
   /**
@@ -39,8 +40,9 @@ export class PackagingInteractor {
    * that can fit within box capacity limits
    */
   private splitArtByQuantity(art: Art, maxQuantity: number): Art[] {
+    const effectiveMax = Math.max(1, maxQuantity);
     const totalQuantity = art.getQuantity();
-    if (totalQuantity <= maxQuantity) {
+    if (totalQuantity <= effectiveMax) {
       return [art];
     }
 
@@ -49,7 +51,7 @@ export class PackagingInteractor {
     let splitIndex = 0;
 
     while (remaining > 0) {
-      const quantityForThisSplit = Math.min(remaining, maxQuantity);
+      const quantityForThisSplit = Math.min(remaining, effectiveMax);
       
       // Create a new Art object with the split quantity
       const splitArt = new Art({
@@ -72,6 +74,25 @@ export class PackagingInteractor {
     }
 
     return splits;
+  }
+
+  private determineMaxPiecesPerBox(art: Art, preferredType: BoxType): number {
+    const typeLimit = getDefaultMaxPiecesPerProduct(art.getProductType());
+    if (typeLimit !== undefined) {
+      return typeLimit;
+    }
+
+    if (PackagingRules.requiresOversizeBox(art)) {
+      return OVERSIZE_PIECES_PER_BOX;
+    }
+
+    const tempBox = new Box({ type: preferredType });
+    const nominal = tempBox.getNominalCapacity();
+    if (Number.isFinite(nominal) && nominal > 0) {
+      return nominal;
+    }
+
+    return 1;
   }
 
   public packBoxes(artCollection: Art[]): BoxPackingResult {
@@ -118,34 +139,7 @@ export class PackagingInteractor {
 
           // Determine split size based on art type and box rules
           // Query the box for the maximum pieces per product type
-          const requiresOversizeBox = PackagingRules.requiresOversizeBox(art);
-          let maxQuantity: number;
-
-          if (requiresOversizeBox) {
-            // Oversized pieces have a limit of 3 per box
-            maxQuantity = 3;
-          } else {
-            // For standard sizes, check the box's per-product-type limit
-            // Create a temporary box to query its rules
-            const tempBox2 = new Box({ type: preferredType });
-            const artType = art.getProductType();
-
-            // Try to get the type-specific limit from Box's internal rules
-            // Default to 6 if no specific limit is set
-            // Note: This is a workaround since Box doesn't expose maxPiecesPerProduct
-            // We use the nominal capacity as a proxy
-            maxQuantity = tempBox2.getNominalCapacity();
-
-            // Special handling for known product types with lower limits
-            if (artType === ArtType.CanvasFloatFrame ||
-                artType === ArtType.AcousticPanel ||
-                artType === ArtType.AcousticPanelFramed) {
-              maxQuantity = 4;
-            } else if (artType === ArtType.PatientBoard) {
-              maxQuantity = 2;
-            }
-          }
-
+          const maxQuantity = this.determineMaxPiecesPerBox(art, preferredType);
           const splits = this.splitArtByQuantity(art, maxQuantity);
           
           for (const splitArt of splits) {

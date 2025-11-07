@@ -74,19 +74,20 @@ describe('PackagingInteractor', () => {
       expect(result.unassignedReasons['ART-CUSTOM']).toContain('custom packaging')
     })
 
-    it('should mark mirrors as unassigned (crate-only)', () => {
+    it('should package mirrors in large cartons when dimensions demand it', () => {
       const mirror = new Art({
         id: 'ART-MIRROR',
         productType: ArtType.Mirror,
         material: ArtMaterial.Mirror,
-        dimensions: { length: 30, width: 40, height: 2 },
+        dimensions: { length: 43, width: 43, height: 2 },
         quantity: 1
       })
 
       const result = interactor.packBoxes([mirror])
 
-      expect(result.unassignedArt.length).toBe(1)
-      expect(result.unassignedReasons['ART-MIRROR']).toContain('Crate-only')
+      expect(result.boxes.length).toBe(1)
+      expect(result.boxes[0].getType()).toBe(BoxType.Large)
+      expect(result.unassignedArt.length).toBe(0)
     })
 
     it('should use standard boxes for items with one dimension ≤36"', () => {
@@ -147,6 +148,70 @@ describe('PackagingInteractor', () => {
       expect(result.boxes).toEqual([])
       expect(result.unassignedArt).toEqual([])
       expect(result.assignments.size).toBe(0)
+    })
+
+    it('does not mix different mediums inside the same box', () => {
+      const canvas = new Art({
+        id: 'ART-CANVAS',
+        productType: ArtType.CanvasFloatFrame,
+        material: ArtMaterial.CanvasFramed,
+        dimensions: { length: 30, width: 24, height: 2 },
+        quantity: 2,
+      })
+
+      const print = new Art({
+        id: 'ART-PRINT',
+        productType: ArtType.PaperPrint,
+        material: ArtMaterial.Glass,
+        dimensions: { length: 33, width: 25, height: 2 },
+        quantity: 2,
+      })
+
+      const result = interactor.packBoxes([canvas, print])
+      expect(result.boxes.length).toBeGreaterThanOrEqual(2)
+
+      result.boxes.forEach((box) => {
+        const types = box.getContents().map((art) => art.getProductType())
+        expect(new Set(types).size).toBeLessThanOrEqual(1)
+      })
+    })
+
+    it('splits large paper prints based on the 6-per-box rule even in large cartons', () => {
+      const largePrints = new Art({
+        id: 'ART-LARGE-PAPER',
+        productType: ArtType.PaperPrint,
+        material: ArtMaterial.Glass,
+        dimensions: { length: 42, width: 40, height: 2 },
+        quantity: 7,
+      })
+
+      const result = interactor.packBoxes([largePrints])
+      const totalPieces = result.boxes.reduce((sum, box) => sum + box.getTotalPieces(), 0)
+
+      expect(totalPieces).toBe(7)
+      result.boxes.forEach((box) => {
+        expect(box.getType()).toBe(BoxType.Large)
+        expect(box.getTotalPieces()).toBeLessThanOrEqual(6)
+      })
+    })
+
+    it('allows mirrors in cartons but caps them at eight pieces per large box', () => {
+      const mirrors = new Art({
+        id: 'ART-MIRROR',
+        productType: ArtType.Mirror,
+        material: ArtMaterial.Mirror,
+        dimensions: { length: 43, width: 43, height: 2 },
+        quantity: 9,
+      })
+
+      const result = interactor.packBoxes([mirrors])
+      const totalPieces = result.boxes.reduce((sum, box) => sum + box.getTotalPieces(), 0)
+
+      expect(totalPieces).toBe(9)
+      result.boxes.forEach((box) => {
+        expect(box.getType()).toBe(BoxType.Large)
+        expect(box.getTotalPieces()).toBeLessThanOrEqual(8)
+      })
     })
   })
 

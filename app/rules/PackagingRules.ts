@@ -34,7 +34,9 @@ export class PackagingRules {
    * Determines if an art piece can only be shipped in crates
    */
   public static requiresCrateOnly(art: Art): boolean {
-    return art.getProductType() === ArtType.Mirror;
+    // Current client guidance allows every supported medium to be boxed,
+    // so no art type is considered crate-only. This hook remains for future overrides.
+    return false;
   }
 
   /**

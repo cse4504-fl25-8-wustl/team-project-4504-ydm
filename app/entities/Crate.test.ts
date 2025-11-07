@@ -64,11 +64,13 @@ describe("Crate", () => {
       expect(crate.canAccommodate(tallBox)).toBe(false);
     });
 
-    it("rejects disallowed box types", () => {
+    it("rejects disallowed box types on restricted pallets", () => {
       const largeBox = makePopulatedBox(BoxType.Large, [
         makeArt({ length: 40, width: 40, height: 4 }),
       ]);
-      expect(crate.canAccommodate(largeBox)).toBe(false);
+
+      const glassPallet = new Crate({ type: CrateType.GlassPallet });
+      expect(glassPallet.canAccommodate(largeBox)).toBe(false);
 
       const oversizePallet = new Crate({ type: CrateType.OversizePallet });
       expect(oversizePallet.canAccommodate(largeBox)).toBe(true);
@@ -89,13 +91,14 @@ describe("Crate", () => {
     });
 
     it("does not mutate state when box is rejected", () => {
+      const glassPallet = new Crate({ type: CrateType.GlassPallet });
       const largeBox = makePopulatedBox(BoxType.Large, [
         makeArt({ length: 40, width: 40, height: 4 }),
       ]);
-      const beforeWeight = crate.getTotalWeight();
-      expect(crate.addBox(largeBox)).toBe(false);
-      expect(crate.getContents()).toHaveLength(0);
-      expect(crate.getTotalWeight()).toBe(beforeWeight);
+      const beforeWeight = glassPallet.getTotalWeight();
+      expect(glassPallet.addBox(largeBox)).toBe(false);
+      expect(glassPallet.getContents()).toHaveLength(0);
+      expect(glassPallet.getTotalWeight()).toBe(beforeWeight);
     });
   });
 

@@ -113,7 +113,7 @@ describe("Box Packing Logic", () => {
   });
 
   describe("Mixed medium packing", () => {
-    test("3 canvas (4 per box) + 2 paper prints (6 per box) should fit in 1 standard box", () => {
+    test("3 canvas (4 per box) + 2 paper prints (6 per box) should use separate boxes per medium", () => {
       const canvas = new Art({
         id: "canvas-1",
         productType: ArtType.CanvasFloatFrame,
@@ -132,8 +132,11 @@ describe("Box Packing Logic", () => {
 
       const result = interactor.packBoxes([canvas, paperPrint]);
 
-      expect(result.boxes.length).toBe(1);
-      expect(result.boxes[0].getTotalPieces()).toBe(5);
+      expect(result.boxes.length).toBe(2);
+      result.boxes.forEach((box) => {
+        const types = new Set(box.getContents().map((art) => art.getProductType()));
+        expect(types.size).toBe(1);
+      });
       expect(result.unassignedArt.length).toBe(0);
     });
 
@@ -267,7 +270,7 @@ describe("Box Packing Logic", () => {
       expect(result.unassignedArt.length).toBe(0);
     });
 
-    test("4 oversized pieces should require 2 large boxes", () => {
+    test("4 oversized pieces should still fit in 1 large box under the 6-per-box rule", () => {
       const art = new Art({
         id: "large-2",
         productType: ArtType.PaperPrint,
@@ -278,10 +281,9 @@ describe("Box Packing Logic", () => {
 
       const result = interactor.packBoxes([art]);
 
-      expect(result.boxes.length).toBe(2);
+      expect(result.boxes.length).toBe(1);
       expect(result.boxes[0].getType()).toBe(BoxType.Large);
-      expect(result.boxes[1].getType()).toBe(BoxType.Large);
-      expect(result.boxes[0].getTotalPieces() + result.boxes[1].getTotalPieces()).toBe(4);
+      expect(result.boxes[0].getTotalPieces()).toBe(4);
       expect(result.unassignedArt.length).toBe(0);
     });
   });
@@ -340,7 +342,7 @@ describe("Box Packing Logic", () => {
       expect(result.unassignedArt.length).toBe(0);
     });
 
-    test("6 standard pieces + 6 large pieces should use 2 boxes", () => {
+    test("6 standard pieces + 6 large pieces can use 2 boxes when standard pieces ride on a large box", () => {
       const standardArt = new Art({
         id: "mixed-3-standard",
         productType: ArtType.PaperPrint,
@@ -359,16 +361,14 @@ describe("Box Packing Logic", () => {
 
       const result = interactor.packBoxes([standardArt, largeArt]);
 
-      // Standard art fills 1 standard box (6 pieces)
-      // Large art requires 2 large boxes (3 per box for oversized)
-      expect(result.boxes.length).toBe(3);
+      expect(result.boxes.length).toBe(2);
       expect(result.unassignedArt.length).toBe(0);
 
       const standardBoxes = result.boxes.filter(b => b.getType() === BoxType.Standard);
       const largeBoxes = result.boxes.filter(b => b.getType() === BoxType.Large);
 
-      expect(standardBoxes.length).toBe(1);
-      expect(largeBoxes.length).toBe(2);
+      expect(standardBoxes.length).toBeLessThanOrEqual(1);
+      expect(largeBoxes.length).toBeGreaterThanOrEqual(1);
     });
   });
 });
