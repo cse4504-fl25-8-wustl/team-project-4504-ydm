@@ -40,10 +40,10 @@ describe("PackagingRules", () => {
   });
 
   describe("requiresCrateOnly", () => {
-    it("returns true only for mirrors", () => {
+    it("currently returns false for supported mediums", () => {
       const mirror = makeArt({ productType: ArtType.Mirror });
       const print = makeArt();
-      expect(PackagingRules.requiresCrateOnly(mirror)).toBe(true);
+      expect(PackagingRules.requiresCrateOnly(mirror)).toBe(false);
       expect(PackagingRules.requiresCrateOnly(print)).toBe(false);
     });
   });
@@ -74,10 +74,11 @@ describe("PackagingRules", () => {
   });
 
   describe("getPackagingRecommendation", () => {
-    it("recommends crate for crate-only items", () => {
+    it("recommends box workflow for mirrors because they are no longer crate-only", () => {
       const mirror = makeArt({ productType: ArtType.Mirror });
       expect(PackagingRules.getPackagingRecommendation(mirror)).toEqual({
-        containerType: "crate",
+        containerType: "box",
+        boxType: "standard",
         specialHandling: true,
       });
     });

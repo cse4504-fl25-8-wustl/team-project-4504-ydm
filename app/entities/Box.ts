@@ -76,7 +76,7 @@ const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
   },
 };
 
-const DEFAULT_CANVAS_PIECES_PER_BOX = 6; // TODO: validate vs written instruction that cites 4 pieces per box.
+const DEFAULT_CANVAS_PIECES_PER_BOX = 4; // Canvas pieces (framed or gallery) can fit 4 per box per packing rules
 
 interface BoxRules {
   maxPiecesPerProduct: Partial<Record<ArtType, number>>;
@@ -84,21 +84,27 @@ interface BoxRules {
   disallowedProductTypes: Set<ArtType>;
 }
 
-const DEFAULT_BOX_RULES: BoxRules = {
-  maxPiecesPerProduct: {
-    [ArtType.PaperPrint]: 6,
-    [ArtType.PaperPrintWithTitlePlate]: 6,
-    [ArtType.CanvasFloatFrame]: DEFAULT_CANVAS_PIECES_PER_BOX,
-    [ArtType.AcousticPanel]: 4,
-    [ArtType.AcousticPanelFramed]: 4,
-    [ArtType.MetalPrint]: 6,
-    [ArtType.Mirror]: 0, // Mirrors are crate-only per packing guidance.
-    [ArtType.WallDecor]: 6,
-    [ArtType.PatientBoard]: 2,
-  },
-  maxOversizedPieces: 3,
-  disallowedProductTypes: new Set([ArtType.Mirror]),
+const MAX_PIECES_PER_PRODUCT: Partial<Record<ArtType, number>> = {
+  [ArtType.PaperPrint]: 6,
+  [ArtType.PaperPrintWithTitlePlate]: 6,
+  [ArtType.CanvasFloatFrame]: DEFAULT_CANVAS_PIECES_PER_BOX,
+  [ArtType.AcousticPanel]: 4,
+  [ArtType.AcousticPanelFramed]: 4,
+  [ArtType.MetalPrint]: 6,
+  [ArtType.Mirror]: 8,
+  [ArtType.WallDecor]: 6,
+  [ArtType.PatientBoard]: 2,
 };
+
+const DEFAULT_BOX_RULES: BoxRules = {
+  maxPiecesPerProduct: MAX_PIECES_PER_PRODUCT,
+  maxOversizedPieces: 3,
+  disallowedProductTypes: new Set<ArtType>(),
+};
+
+export function getDefaultMaxPiecesPerProduct(type: ArtType): number | undefined {
+  return MAX_PIECES_PER_PRODUCT[type];
+}
 
 export interface BoxOptions {
   type?: BoxType;
@@ -119,6 +125,7 @@ export class Box {
   private requiredLength: number;
   private requiredWidth: number;
   private requiredHeight: number;
+  private currentProductType?: ArtType;
 
   constructor(options: BoxOptions = {}) {
     const type = options.type ?? BoxType.Standard;
@@ -150,6 +157,7 @@ export class Box {
     this.requiredLength = this.spec.innerLength;
     this.requiredWidth = this.spec.innerWidth;
     this.requiredHeight = this.spec.innerHeight;
+    this.currentProductType = undefined;
   }
 
   public getType(): BoxType {
@@ -173,7 +181,13 @@ export class Box {
   }
 
   public canAccommodate(art: Art): boolean {
-    if (this.rules.disallowedProductTypes.has(art.getProductType())) {
+    const type = art.getProductType();
+
+    if (this.rules.disallowedProductTypes.has(type)) {
+      return false;
+    }
+
+    if (this.currentProductType !== undefined && this.currentProductType !== type) {
       return false;
     }
 
@@ -190,7 +204,6 @@ export class Box {
     }
 
     const quantity = art.getQuantity();
-    const type = art.getProductType();
     const currentCount = this.counts.get(type) ?? 0;
     const limit = this.rules.maxPiecesPerProduct[type];
 
@@ -200,9 +213,23 @@ export class Box {
 
     // Only apply oversized piece limit if item requires oversize box (both dimensions >36")
     // Items with one dimension ≤36" fit in standard boxes and use regular capacity limits
+    // Note: If product has a specific limit (e.g., PaperPrint = 6), use that instead of oversized limit
+    // The oversized limit (3) only applies to products without specific limits
     if (PackagingRules.requiresOversizeBox(art)) {
-      if (this.oversizedPieces + quantity > this.rules.maxOversizedPieces) {
-        return false;
+      const productLimit = this.rules.maxPiecesPerProduct[type];
+      const oversizedLimit = this.rules.maxOversizedPieces;
+      
+      // If product has a specific limit that's higher than oversized limit, use product limit
+      // Otherwise, use the more restrictive limit (oversized limit)
+      if (productLimit !== undefined && productLimit >= oversizedLimit) {
+        // Product limit is higher or equal to oversized limit - don't check oversized limit
+        // The product limit check above (line 197-199) is sufficient
+        // This allows PaperPrint to fit 6 pieces even in oversized boxes
+      } else {
+        // No product-specific limit or product limit is lower - use oversized limit
+        if (this.oversizedPieces + quantity > oversizedLimit) {
+          return false;
+        }
       }
     }
 
@@ -221,6 +248,9 @@ export class Box {
     this.contents.push(art);
 
     const type = art.getProductType();
+    if (this.currentProductType === undefined) {
+      this.currentProductType = type;
+    }
     const quantity = art.getQuantity();
     const updatedCount = (this.counts.get(type) ?? 0) + quantity;
     this.counts.set(type, updatedCount);
@@ -247,7 +277,12 @@ export class Box {
       return false;
     }
 
-    return this.totalPieces >= this.nominalCapacity;
+    const limit = this.getActiveCapacityLimit();
+    if (!Number.isFinite(limit)) {
+      return false;
+    }
+
+    return this.totalPieces >= limit;
   }
 
   public getRemainingCapacity(): number {
@@ -255,7 +290,12 @@ export class Box {
       return Number.POSITIVE_INFINITY;
     }
 
-    return Math.max(0, this.nominalCapacity - this.totalPieces);
+    const limit = this.getActiveCapacityLimit();
+    if (!Number.isFinite(limit)) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    return Math.max(0, limit - this.totalPieces);
   }
 
   public getTotalWeight(): number {
@@ -290,6 +330,21 @@ export class Box {
       width: this.spec.innerWidth,
       height: this.spec.innerHeight,
     };
+  }
+
+  private getActiveCapacityLimit(): number {
+    if (this.currentProductType !== undefined) {
+      const typeLimit = this.rules.maxPiecesPerProduct[this.currentProductType];
+      if (typeLimit !== undefined) {
+        return typeLimit;
+      }
+
+      if (this.oversizedPieces > 0) {
+        return this.rules.maxOversizedPieces;
+      }
+    }
+
+    return this.nominalCapacity;
   }
 
   private fitsDimensions(art: Art): boolean {

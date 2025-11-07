@@ -32,9 +32,11 @@ describe("Box", () => {
   });
 
   describe("canAccommodate", () => {
-    it("rejects crate-only art (mirrors)", () => {
-      const mirror = makeArt({ productType: ArtType.Mirror });
-      expect(box.canAccommodate(mirror)).toBe(false);
+    it("rejects mixing different product types once a box has contents", () => {
+      const canvas = makeArt({ productType: ArtType.CanvasFloatFrame });
+      const print = makeArt({ productType: ArtType.PaperPrint });
+      expect(box.addArt(canvas)).toBe(true);
+      expect(box.canAccommodate(print)).toBe(false);
     });
 
     it("rejects art that needs custom packaging (both sides > 43.5\")", () => {
@@ -52,17 +54,16 @@ describe("Box", () => {
       expect(box.canAccommodate(bulk)).toBe(false);
     });
 
-    it("rejects when oversized pieces exceed maxOversizedPieces in a large box", () => {
+    it("enforces per-product limits for oversized pieces in a large box", () => {
       const largeBox = new Box({ type: BoxType.Large });
-      const oversizeArt = makeArt({ dimensions: { length: 40, width: 38, height: 4 } });
+      const oversizeBundle = makeArt({
+        dimensions: { length: 42, width: 40, height: 4 },
+        quantity: 6,
+      });
 
-      expect(largeBox.canAccommodate(oversizeArt)).toBe(true);
-      largeBox.addArt(oversizeArt); // 1
-      largeBox.addArt(makeArt({ dimensions: { length: 39, width: 37, height: 4 } })); // 2
-      largeBox.addArt(makeArt({ dimensions: { length: 42, width: 38, height: 4 } })); // 3
-
-      const fourth = makeArt({ dimensions: { length: 41, width: 37, height: 4 } });
-      expect(largeBox.canAccommodate(fourth)).toBe(false);
+      expect(largeBox.addArt(oversizeBundle)).toBe(true);
+      const extra = makeArt({ dimensions: { length: 41, width: 38, height: 4 } });
+      expect(largeBox.canAccommodate(extra)).toBe(false);
     });
 
     it("accepts art that fits standard box rules", () => {

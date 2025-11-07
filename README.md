@@ -31,12 +31,62 @@ This project uses [Vitest](https://vitest.dev/) as the testing framework. The fo
   pnpm test:coverage
   ```
 
+### End-to-End Regression Suite
+In addition to unit tests we keep full-run fixtures so everyone can verify JSON output stays aligned with goldens.
+
+- **Run all tests** (box packing, pallet packing, and crate packing):
+  ```bash
+  ./run-all-tests.sh
+  ```
+  This script automatically runs all test types and provides a comprehensive summary.
+  
+- **Run specific test types** by specifying a directory:
+  ```bash
+  ./run-all-tests.sh test_inputs_and_outputs  # Box packing tests
+  ./run-all-tests.sh test_data/pallet        # Pallet packing tests
+  ./run-all-tests.sh test_cases/crate_packing # Crate packing tests
+  ```
+- **Official `test_cases` repository**: the upstream copy still contains placeholder values (`X`, `Y`, `Z`, zeroed expected outputs). Before using the script against `../test_cases`, make sure every CSV/JSON pair has been filled out with real client data; otherwise the parser will continue to error out on unknown media/dimensions even though the application logic is correct.
+  
+The script exits non‑zero when any case fails, making it CI-friendly once both data sets are fully populated.
+
+**Note:** The script uses `pnpm package` to run test cases and uses Node.js for JSON comparison (with `jq` as fallback if available), making it work on Windows/WSL environments.
+
 ### Running the Application
 - Run the packaging workflow:
   ```bash
-  pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery>
+  pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery> [--json-output <output-file>]
   ```
   Boolean flags accept `yes/no`, `true/false`, `y/n`, or `1/0`.
+  
+- **Optional JSON Output:** Use the `--json-output` (or `-j`) flag to write results to a JSON file:
+  ```bash
+  pnpm package input.csv "Client" "Location" "Delivery" yes no no no no --json-output output.json
+  ```
+  The JSON output follows this schema:
+  ```json
+  {
+    "total_pieces": <number>,
+    "standard_size_pieces": <number>,
+    "oversized_pieces": [
+      {
+        "side1": <number>,
+        "side2": <number>,
+        "quantity": <number>
+      }
+    ],
+    "standard_box_count": <number>,
+    "large_box_count": <number>,
+    "custom_piece_count": <number>,
+    "standard_pallet_count": <number>,
+    "oversized_pallet_count": <number>,
+    "crate_count": <number>,
+    "total_artwork_weight": <number>,
+    "total_packaging_weight": <number>,
+    "final_shipment_weight": <number>
+  }
+  ```
+  
 - Example invocation (all dummy data for now):
   ```bash
   pnpm package test_art.csv "MedStar" "Chevy Chase, MD" "Delivery + Installation" yes yes no yes yes
@@ -153,3 +203,90 @@ The testing responsibilities have been distributed evenly among the 3 team membe
 - `DimensionUtils.roundUpDimension()` - Dimension rounding logic
 - `DimensionUtils.getPlanarFootprint()` - Planar footprint calculations
 - `DimensionUtils.fitsWithin()` - Dimension fitting validation
+
+## Feature 2 Work Plan
+
+### Overview
+Feature 2 focuses on implementing compatibility with the test_cases repository format and adding JSON output functionality. The application must:
+- Work with the input file format used in the test_cases GitHub repository
+- Accept an optional command line argument with a JSON output file name
+- Write results to that file in the JSON format specified in Feature 2 development
+- Pass all test cases from the test_cases repository
+
+**Timeline:**
+- **Week 1:** Half of the test cases must pass (box_packing tests)
+- **Week 2:** All remaining test cases must pass (crate_packing and pallet_packing tests)
+
+### Team Responsibilities
+
+#### **Yisu Wang** - Input Format Compatibility & Box Packing Tests
+**Responsibilities:**
+- Update CSV parser to handle test_cases repository input format
+- Ensure compatibility with varying CSV structures across test categories
+- Implement and validate box packing logic for all box_packing test cases:
+  - `SameMediumSameSize/` (StandardBox, LargeBox)
+  - `SameMediumMixedSize/`
+  - `MixedMediumSameSize/`
+  - `VaryingSizes/` (13 dimension variations)
+- Debug and fix any parsing issues with edge cases
+- Ensure proper handling of dimension variations (X, X placeholders)
+
+#### **Martin Rivera** - JSON Output & Crate Packing Tests
+**Responsibilities:**
+- Implement JSON output functionality with optional file argument
+- Design and implement JSON output format matching test_cases expected_output.json structure
+- Add command-line argument parsing for optional JSON output file name
+- Implement and validate crate packing logic for all crate_packing test cases:
+  - `standard_box/`
+  - `large_box/`
+  - `mixed_boxes/`
+- Ensure JSON output includes all required fields (total_pieces, box counts, etc.)
+- Handle file I/O operations and error handling for JSON output
+
+#### **Daniel Yan** - Test Integration & Pallet Packing Tests
+**Responsibilities:**
+- Set up automated test runner for test_cases repository
+- Create test harness to validate against expected_output.json files
+- Implement and validate pallet packing logic for all pallet_packing test cases:
+  - `standard_pallet/`
+  - `oversized_pallet/`
+- Build comparison utilities to diff actual vs expected JSON output
+- Create test reporting dashboard showing pass/fail status
+- Coordinate integration between parser updates and output format
+
+### Workflow
+
+Our team will use a **feature branch workflow with pull request reviews**:
+
+1. **Branch Strategy:**
+   - The `feature2` branch serves as our integration branch for Feature 2 work
+   - Each team member creates individual feature branches off `feature2` (e.g., `daniel/catalog-data`, `yisu/unit-conversions`, `martin/id-system`)
+   - Work is done in isolation on personal feature branches
+
+2. **Development Process:**
+   - Each developer works on their assigned responsibilities in their own branch
+   - Commits are made frequently with clear, descriptive messages
+   - Code is tested locally before submitting for review
+
+3. **Pull Request & Review:**
+   - When a feature is complete, the developer opens a pull request to merge into `feature2`
+   - At least one other team member reviews the PR
+   - Reviewers check for:
+     - Code quality and adherence to project standards
+     - Proper test coverage
+     - Documentation and comments
+     - Integration with existing code
+   - Feedback is addressed through additional commits
+   - Once approved, the PR is merged into `feature2`
+
+4. **Integration & Testing:**
+   - After merging to `feature2`, the team verifies integration
+   - End-to-end tests are run to ensure all components work together
+   - Any integration issues are addressed promptly
+
+5. **Communication:**
+   - Team members communicate progress and blockers regularly
+   - Dependencies between tasks are identified early
+   - Code reviews are completed within 24 hours when possible
+
+This workflow ensures code quality, knowledge sharing, and reduces the risk of conflicts while maintaining a clean commit history.
