@@ -35,7 +35,8 @@
     ],
     "mac": {
       "target": "dmg",
-      "icon": "electron/icon.icns"
+      "icon": "electron/icon.icns",
+      "identity": null
     },
     "win": {
       "target": "nsis",

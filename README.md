@@ -150,7 +150,15 @@ pnpm electron:build:mac
 
 **Output:**
 - Location: `dist/ARCH Freight Calculator-1.0.0.dmg`
-- Users can double-click the `.dmg` file, then drag the app to Applications
+
+**Installation on macOS:**
+1. Download the `.dmg` file
+2. **Right-click** (or Control+click) on the `.dmg` file
+3. Select **"Open"** from the menu
+4. Click **"Open"** when prompted
+5. Drag the app to Applications folder
+
+**Note:** This app is unsigned. macOS will block it if you double-click. You must right-click and select "Open" to bypass Gatekeeper. This is normal for educational/open-source projects without an Apple Developer certificate ($99/year).
 
 #### Building for Windows
 

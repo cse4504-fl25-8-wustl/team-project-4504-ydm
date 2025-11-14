@@ -35,6 +35,7 @@ jobs:
         env:
           ELECTRON_BUILD: 'true'
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload Mac artifact
         uses: actions/upload-artifact@v4
