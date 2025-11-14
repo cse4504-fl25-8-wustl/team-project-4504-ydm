@@ -21,6 +21,7 @@ build/
 # IDE and editor files
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -100,3 +101,4 @@ Input1_test_plan.md
 Input1_test_plan.pdf
 FEATURE2_TEST_VALIDATION.md
 FEATURE2_YISU_SUMMARY.md
+

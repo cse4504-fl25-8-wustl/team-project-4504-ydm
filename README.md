@@ -152,13 +152,38 @@ pnpm electron:build:mac
 - Location: `dist/ARCH Freight Calculator-1.0.0.dmg`
 
 **Installation on macOS:**
-1. Download the `.dmg` file
-2. **Right-click** (or Control+click) on the `.dmg` file
-3. Select **"Open"** from the menu
-4. Click **"Open"** when prompted
-5. Drag the app to Applications folder
 
-**Note:** This app is unsigned. macOS will block it if you double-click. You must right-click and select "Open" to bypass Gatekeeper. This is normal for educational/open-source projects without an Apple Developer certificate ($99/year).
+⚠️ **Important:** This app is unsigned and will be blocked by macOS Gatekeeper. Follow these steps:
+
+1. **Download and install** the `.dmg` file:
+   - Open the `.dmg` file
+   - Drag the app to your Applications folder
+
+2. **Remove quarantine attribute** (required):
+   ```bash
+   sudo xattr -cr "/Applications/ARCH Freight Calculator.app"
+   ```
+   Enter your password when prompted.
+
+3. **Launch the app** from Applications folder or Launchpad
+
+**Why is this needed?**
+- macOS marks all apps downloaded from the internet with a "quarantine" attribute
+- Unsigned apps with this attribute will show "app is damaged" error
+- The `xattr -cr` command removes this security flag, allowing the app to run
+- This is normal for educational/open-source projects without an Apple Developer certificate ($99/year)
+
+**Alternative methods:**
+- **Option 1:** Disable Gatekeeper temporarily (least secure):
+  ```bash
+  sudo spctl --master-disable
+  ```
+  After opening the app once, re-enable with `sudo spctl --master-enable`
+
+- **Option 2:** If you see "Open anyway" in System Settings:
+  1. Try opening the app (it will fail)
+  2. Go to System Settings → Privacy & Security
+  3. Scroll down and click "Open Anyway" next to the blocked app message
 
 #### Building for Windows
 
