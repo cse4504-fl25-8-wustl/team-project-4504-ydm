@@ -118,48 +118,116 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
 
 ### Building One-Click Executables
 
+This guide explains how to build standalone installers for Windows and macOS that users can download and install with a single click.
+
 #### Prerequisites
-- Node.js 20+
-- pnpm installed globally
-- For Mac builds: macOS with Xcode Command Line Tools
-- For Windows builds: Windows with Visual Studio Build Tools or run on Windows/WSL
+
+**Common Requirements:**
+- Node.js 20 or higher
+- pnpm installed globally (`npm install -g pnpm`)
+- All project dependencies installed (`pnpm install`)
+
+**Platform-Specific Requirements:**
+- **macOS**: macOS 13+ with Xcode Command Line Tools installed (`xcode-select --install`)
+- **Windows**: Windows 10/11 with Administrator privileges (required for symlink creation during build)
 
 #### Building for macOS
-```bash
-# Using the build script
-./scripts/build-electron.sh mac
 
-# Or directly with pnpm
+**Option 1: Using the Build Script (Recommended)**
+```bash
+./scripts/build-electron.sh mac
+```
+
+**Option 2: Direct pnpm Command**
+```bash
 pnpm electron:build:mac
 ```
-> Tested on macOS 13+ with Xcode Command Line Tools installed (`xcode-select --install`). Make sure Node.js 20 and pnpm 10+ are available.
 
-This will create a `.dmg` installer in the `dist/` directory that users can double-click to install.
+**What Happens:**
+1. Builds the Next.js application in standalone mode
+2. Copies static assets to the standalone directory
+3. Packages everything into a `.dmg` installer using electron-builder
+
+**Output:**
+- Location: `dist/ARCH Freight Calculator-1.0.0.dmg`
+- Users can double-click the `.dmg` file, then drag the app to Applications
 
 #### Building for Windows
+
+**Important:** Windows builds require Administrator privileges due to symlink creation during the Next.js standalone build process.
+
+**Option 1: Using PowerShell Script (Recommended)**
+1. Right-click `build-windows.ps1` in the project root
+2. Select "Run with PowerShell"
+3. Click "Yes" when prompted for Administrator privileges
+4. The script will automatically check for admin rights and guide you through the build
+
+**Option 2: Using Batch Script**
+1. Right-click `build-windows.bat` in the project root
+2. Select "Run as administrator"
+3. The script will check for admin rights and run the build
+
+**Option 3: Manual Command (PowerShell as Administrator)**
+1. Open PowerShell as Administrator (Right-click → "Run as Administrator")
+2. Navigate to the project directory:
+   ```powershell
+   cd D:\path\to\team-project-4504-ydm
+   ```
+3. Run the build:
+   ```powershell
+   pnpm electron:build:win
+   ```
+
+**Option 4: Using the Build Script (Linux/WSL)**
 ```bash
-# Using the build script
 ./scripts/build-electron.sh win
-
-# Or directly with pnpm
-pnpm electron:build:win
 ```
-> Requires Windows 10/11 with Visual Studio Build Tools (C++ workload) installed. When running in CI, `windows-latest` already has the prerequisites.
 
-This will create an `.exe` installer in the `dist/` directory.
+**What Happens:**
+1. Builds the Next.js application in standalone mode
+2. Copies static assets to the standalone directory
+3. Packages everything into an `.exe` installer using electron-builder
 
-#### Build Output
-- **macOS**: `dist/ARCH Freight Calculator-1.0.0.dmg`
-- **Windows**: `dist/ARCH Freight Calculator Setup 1.0.0.exe`
+**Output:**
+- Location: `dist/ARCH Freight Calculator Setup 1.0.0.exe`
+- Users can double-click the `.exe` file to run the installer
+
+**Troubleshooting Windows Builds:**
+- **Symlink Permission Error**: Make sure you're running PowerShell/Terminal as Administrator
+- **Alternative**: Enable Windows Developer Mode (Settings → Privacy & Security → For developers → Developer Mode)
+
+#### Build Output Summary
+
+| Platform | Output File | Location | Size (Approx.) |
+|----------|-------------|----------|----------------|
+| macOS | `ARCH Freight Calculator-1.0.0.dmg` | `dist/` | ~250-500 MB |
+| Windows | `ARCH Freight Calculator Setup 1.0.0.exe` | `dist/` | ~140-200 MB |
 
 #### Testing the Build Locally
-1. Install dependencies: `pnpm install`
-2. Build the application: `./scripts/build-electron.sh`
-3. The executable will be in the `dist/` directory
-4. On Mac: Open the `.dmg` and drag the app to Applications
-5. On Windows: Run the `.exe` installer
 
-**Note:** Icon files (`electron/icon.icns` for Mac and `electron/icon.ico` for Windows) need to be added for production builds. Placeholder files are currently in place.
+1. **Install dependencies** (if not already done):
+   ```bash
+   pnpm install
+   ```
+
+2. **Build the application** using one of the methods above
+
+3. **Locate the installer** in the `dist/` directory
+
+4. **Test the installer:**
+   - **macOS**: Open the `.dmg` file and drag the app to Applications, then launch it
+   - **Windows**: Run the `.exe` installer, follow the installation wizard, then launch the app from Start menu
+
+5. **Verify functionality:**
+   - The GUI should load correctly
+   - Test uploading a CSV file
+   - Verify the packaging calculation works
+
+#### Notes
+
+- **Icon Files**: Custom icon files (`electron/icon.icns` for Mac and `electron/icon.ico` for Windows) can be added for production builds. The build will use default Electron icons if custom icons are not provided.
+- **Build Time**: First build may take 5-10 minutes as it downloads Electron binaries. Subsequent builds are faster.
+- **File Size**: The installers include the entire Next.js application and all dependencies, so they are relatively large.
 
 ### Alpha Release Responsibilities
 
