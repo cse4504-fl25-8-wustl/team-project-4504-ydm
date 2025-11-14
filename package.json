@@ -27,6 +27,7 @@
       "output": "dist"
     },
     "asar": false,
+    "publish": null,
     "files": [
       "electron/**/*",
       ".next/standalone/**/*",
