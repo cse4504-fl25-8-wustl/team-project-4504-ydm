@@ -30,6 +30,8 @@ jobs:
 
       - name: Build Mac Electron application
         run: pnpm electron:build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Mac artifact
         uses: actions/upload-artifact@v4
@@ -58,6 +60,8 @@ jobs:
 
       - name: Build Windows Electron application
         run: pnpm electron:build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
