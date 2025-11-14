@@ -1,12 +1,46 @@
-const { app, BrowserWindow } = require('electron');
-const path = require('path');
-const { spawn } = require('child_process');
+import { app, BrowserWindow, dialog } from 'electron';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let mainWindow;
 let nextServer;
+let serverReady = false;
 
-const isDev = process.env.NODE_ENV === 'development';
-const port = process.env.PORT || 3000;
+const port = Number(process.env.PORT) || 3000;
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const startUrl = `http://localhost:${port}/gui`;
+
+const buildRoot = app.isPackaged
+  ? path.join(process.resourcesPath, 'app')
+  : path.join(__dirname, '..');
+const standaloneRoot = path.join(buildRoot, '.next/standalone');
+
+function findStandaloneServer(root) {
+  if (!fs.existsSync(root)) {
+    return null;
+  }
+  const directEntry = path.join(root, 'server.js');
+  if (fs.existsSync(directEntry)) {
+    return directEntry;
+  }
+
+  const entries = fs.readdirSync(root, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      const result = findStandaloneServer(path.join(root, entry.name));
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  return null;
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -19,13 +53,8 @@ function createWindow() {
     title: 'ARCH Freight Calculator',
   });
 
-  const startUrl = isDev
-    ? `http://localhost:${port}/gui`
-    : `file://${path.join(__dirname, '../.next/server/app/gui/page.html')}`;
-
   mainWindow.loadURL(startUrl);
 
-  // Open DevTools in development
   if (isDev) {
     mainWindow.webContents.openDevTools();
   }
@@ -35,36 +64,102 @@ function createWindow() {
   });
 }
 
-function startNextServer() {
-  if (isDev) {
-    // In development, Next.js dev server should already be running
-    return;
+function ensureNextServer() {
+  if (isDev || serverReady) {
+    return Promise.resolve();
   }
 
-  // In production, start Next.js server
-  const nextServerPath = path.join(__dirname, '../node_modules/.bin/next');
-  nextServer = spawn('node', [nextServerPath, 'start', '-p', port], {
-    cwd: path.join(__dirname, '..'),
-    env: { ...process.env, NODE_ENV: 'production' },
-  });
+  const serverEntry = findStandaloneServer(standaloneRoot);
+  if (!serverEntry) {
+    const error = new Error(
+      `Standalone server not found under ${standaloneRoot}. 请先执行 \"pnpm electron:build:mac\" 重新打包。`,
+    );
+    return Promise.reject(error);
+  }
 
-  nextServer.stdout.on('data', (data) => {
-    console.log(`Next.js: ${data}`);
-  });
+  if (nextServer) {
+    return Promise.resolve();
+  }
 
-  nextServer.stderr.on('data', (data) => {
-    console.error(`Next.js Error: ${data}`);
+  return new Promise((resolve, reject) => {
+    const cwd = buildRoot;
+    const env = {
+      ...process.env,
+      PORT: String(port),
+      NODE_ENV: 'production',
+      NEXT_TELEMETRY_DISABLED: '1',
+      ELECTRON_RUN_AS_NODE: '1',
+    };
+
+    nextServer = spawn(process.execPath, [serverEntry], {
+      cwd,
+      env,
+    });
+
+    let timeout;
+
+    const markReady = () => {
+      if (!serverReady) {
+        serverReady = true;
+        clearTimeout(timeout); // Clear timeout when server is ready
+        resolve();
+      }
+    };
+
+    nextServer.stdout.on('data', (data) => {
+      const message = data.toString();
+      console.log(`Next.js: ${message}`);
+      // Match both old and new Next.js output formats
+      if (
+        message.toLowerCase().includes('started server on') ||
+        message.toLowerCase().includes('ready in')
+      ) {
+        markReady();
+      }
+    });
+
+    nextServer.stderr.on('data', (data) => {
+      console.error(`Next.js Error: ${data}`);
+    });
+
+    nextServer.on('error', (error) => {
+      console.error('Failed to start Next.js server:', error);
+      clearTimeout(timeout);
+      reject(error);
+    });
+
+    // Increase timeout to 8 seconds for slower systems
+    // and add HTTP health check as backup
+    timeout = setTimeout(() => {
+      console.log('Timeout reached, checking if server is responding...');
+      // Try to verify server is actually ready by making a simple request
+      fetch(`http://localhost:${port}/gui`)
+        .then(() => {
+          console.log('Server verified via HTTP check');
+          markReady();
+        })
+        .catch((err) => {
+          console.warn('Server may not be ready yet:', err.message);
+          markReady(); // Mark ready anyway to avoid blocking
+        });
+    }, 8000);
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!isDev) {
-    startNextServer();
-    // Wait a bit for the server to start
-    setTimeout(createWindow, 3000);
-  } else {
-    createWindow();
+    try {
+      await ensureNextServer();
+    } catch (error) {
+      console.error(error);
+      dialog.showErrorBox(
+        'Failed to start application',
+        'The embedded Next.js server could not be started. Please rebuild the application and try again.',
+      );
+    }
   }
+
+  createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -74,16 +169,22 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  // On macOS, also kill the Next.js server when all windows are closed
+  // to avoid leaving orphaned processes
   if (nextServer) {
     nextServer.kill();
+    nextServer = null;
+    serverReady = false;
   }
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // On macOS, apps typically stay open without windows, but for this app
+  // we quit completely to avoid confusion with the background server
+  app.quit();
 });
 
 app.on('before-quit', () => {
   if (nextServer) {
     nextServer.kill();
+    nextServer = null;
+    serverReady = false;
   }
 });

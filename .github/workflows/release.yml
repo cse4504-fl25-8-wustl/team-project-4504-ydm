@@ -12,35 +12,53 @@ on:
 jobs:
   build-mac:
     runs-on: macos-latest
-    # This job will be implemented by another person
-    steps:
-      - name: Placeholder for Mac build
-        run: echo "Mac build will be implemented here"
 
-  build-windows:
-    runs-on: windows-latest
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Install dependencies
-        run: npm ci
-      
-      - name: Build Next.js application
-        run: npm run build
-        env:
-          ELECTRON_BUILD: 'true'
-      
+        run: pnpm install
+
+      - name: Build Mac Electron application
+        run: pnpm electron:build:mac
+
+      - name: Upload Mac artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-installer
+          path: dist/*.dmg
+          retention-days: 30
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install
+
       - name: Build Windows Electron application
-        run: npm run electron:build:win
-      
+        run: pnpm electron:build:win
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:

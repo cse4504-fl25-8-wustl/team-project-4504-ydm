@@ -16,22 +16,21 @@ if [ ! -d "node_modules" ]; then
   pnpm install
 fi
 
-# Build Next.js application
-echo "🔨 Building Next.js application..."
-export ELECTRON_BUILD=true
-pnpm build
-
-# Build Electron application
+# Build Electron application (scripts run Next build with ELECTRON_BUILD=1)
 echo "📱 Packaging Electron application..."
-if [ "$PLATFORM" = "mac" ]; then
-  echo "Building for macOS..."
-  pnpm electron:build:mac
-elif [ "$PLATFORM" = "win" ]; then
-  echo "Building for Windows..."
-  pnpm electron:build:win
-else
-  echo "Building for current platform..."
-  pnpm electron:build
-fi
+case "$PLATFORM" in
+  mac)
+    echo "Building for macOS..."
+    pnpm electron:build:mac
+    ;;
+  win)
+    echo "Building for Windows..."
+    pnpm electron:build:win
+    ;;
+  *)
+    echo "Building for current platform..."
+    pnpm electron:build
+    ;;
+esac
 
 echo "✅ Build complete! Check the 'dist' directory for the executable."

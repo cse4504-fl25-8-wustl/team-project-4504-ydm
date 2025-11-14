@@ -73,6 +73,11 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
   pnpm electron:dev
   ```
   This will start the Next.js dev server and launch the Electron window automatically.
+  If Electron ever complains about a corrupt install (e.g. `Electron failed to install correctly`), rerun
+  ```bash
+  pnpm exec node node_modules/.pnpm/electron@<version>/node_modules/electron/install.js
+  ```
+  to re-extract the binary.
   
 - **Optional JSON Output:** Use the `--json-output` (or `-j`) flag to write results to a JSON file:
   ```bash
@@ -127,6 +132,7 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
 # Or directly with pnpm
 pnpm electron:build:mac
 ```
+> Tested on macOS 13+ with Xcode Command Line Tools installed (`xcode-select --install`). Make sure Node.js 20 and pnpm 10+ are available.
 
 This will create a `.dmg` installer in the `dist/` directory that users can double-click to install.
 
@@ -138,6 +144,7 @@ This will create a `.dmg` installer in the `dist/` directory that users can doub
 # Or directly with pnpm
 pnpm electron:build:win
 ```
+> Requires Windows 10/11 with Visual Studio Build Tools (C++ workload) installed. When running in CI, `windows-latest` already has the prerequisites.
 
 This will create an `.exe` installer in the `dist/` directory.
 

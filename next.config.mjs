@@ -1,11 +1,23 @@
+import path from 'node:path';
+
+const isElectronBuild = Boolean(process.env.ELECTRON_BUILD);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable standalone output for Electron
-  output: process.env.ELECTRON_BUILD ? 'standalone' : undefined,
-  // Disable image optimization for Electron builds
+  output: isElectronBuild ? 'standalone' : undefined,
   images: {
     unoptimized: true,
   },
+  ...(isElectronBuild && {
+    outputFileTracingRoot: path.resolve(process.cwd()),
+  }),
+  // Optimize bundle size for Electron
+  experimental: {
+    optimizePackageImports: ['react', 'react-dom'],
+  },
+  // Production optimizations
+  productionBrowserSourceMaps: false,
+  compress: true,
 };
 
 export default nextConfig;
