@@ -43,7 +43,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "npmRebuild": false,
+    "nodeGypRebuild": false
   },
   "dependencies": {
     "csv-parser": "^3.2.0",
