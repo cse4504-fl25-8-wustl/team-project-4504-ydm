@@ -139,7 +139,7 @@ jobs:
             
             **Available Downloads:**
             - Windows: `.exe` installer
-            - macOS: `.dmg` installer (if available)
+            - macOS: `.dmg` installer
           draft: false
           prerelease: ${{ contains(steps.tag.outputs.tag_name, 'alpha') || contains(steps.tag.outputs.tag_name, 'beta') }}
           files: |
