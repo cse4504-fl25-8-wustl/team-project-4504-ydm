@@ -16,9 +16,9 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "cross-env ELECTRON_BUILD=1 next build && node scripts/copy-standalone-assets.mjs && electron-builder",
-    "electron:build:mac": "cross-env ELECTRON_BUILD=1 next build && node scripts/copy-standalone-assets.mjs && electron-builder --mac",
-    "electron:build:win": "cross-env ELECTRON_BUILD=1 next build && node scripts/copy-standalone-assets.mjs && electron-builder --win"
+    "electron:build": "cross-env ELECTRON_BUILD=1 next build && node scripts/copy-standalone-assets.mjs && node scripts/resolve-symlinks.mjs && electron-builder",
+    "electron:build:mac": "cross-env ELECTRON_BUILD=1 next build && node scripts/copy-standalone-assets.mjs && node scripts/resolve-symlinks.mjs && electron-builder --mac",
+    "electron:build:win": "cross-env ELECTRON_BUILD=1 next build && node scripts/copy-standalone-assets.mjs && node scripts/resolve-symlinks.mjs && electron-builder --win"
   },
   "build": {
     "appId": "com.archdesign.freightcalculator",
@@ -30,8 +30,13 @@
     "publish": null,
     "files": [
       "electron/**/*",
-      ".next/standalone/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "app/.next/standalone"
+      }
     ],
     "mac": {
       "target": "dmg",
