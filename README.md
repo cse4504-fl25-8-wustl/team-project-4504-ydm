@@ -53,11 +53,31 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
 **Note:** The script uses `pnpm package` to run test cases and uses Node.js for JSON comparison (with `jq` as fallback if available), making it work on Windows/WSL environments.
 
 ### Running the Application
+
+#### Command Line Interface (CLI)
 - Run the packaging workflow:
   ```bash
   pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery> [--json-output <output-file>]
   ```
   Boolean flags accept `yes/no`, `true/false`, `y/n`, or `1/0`.
+
+#### Graphical User Interface (GUI)
+- **Development mode** (with hot reload):
+  ```bash
+  pnpm dev
+  ```
+  Then open your browser to `http://localhost:3000/gui`
+
+- **Electron desktop app** (development):
+  ```bash
+  pnpm electron:dev
+  ```
+  This will start the Next.js dev server and launch the Electron window automatically.
+  If Electron ever complains about a corrupt install (e.g. `Electron failed to install correctly`), rerun
+  ```bash
+  pnpm exec node node_modules/.pnpm/electron@<version>/node_modules/electron/install.js
+  ```
+  to re-extract the binary.
   
 - **Optional JSON Output:** Use the `--json-output` (or `-j`) flag to write results to a JSON file:
   ```bash
@@ -96,6 +116,143 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
   pnpm package input1_test.csv "Client" "Location" "Delivery + Installation" yes no no no no
   ```
 
+### Building One-Click Executables
+
+This guide explains how to build standalone installers for Windows and macOS that users can download and install with a single click.
+
+#### Prerequisites
+
+**Common Requirements:**
+- Node.js 20 or higher
+- pnpm installed globally (`npm install -g pnpm`)
+- All project dependencies installed (`pnpm install`)
+
+**Platform-Specific Requirements:**
+- **macOS**: macOS 13+ with Xcode Command Line Tools installed (`xcode-select --install`)
+- **Windows**: Windows 10/11 with Administrator privileges (required for symlink creation during build)
+
+#### Building for macOS
+
+**Option 1: Using the Build Script (Recommended)**
+```bash
+./scripts/build-electron.sh mac
+```
+
+**Option 2: Direct pnpm Command**
+```bash
+pnpm electron:build:mac
+```
+
+**What Happens:**
+1. Builds the Next.js application in standalone mode
+2. Copies static assets to the standalone directory
+3. Packages everything into a `.dmg` installer using electron-builder
+
+**Output:**
+- Location: `dist/ARCH Freight Calculator-1.0.0.dmg`
+- Users can double-click the `.dmg` file, then drag the app to Applications
+
+#### Building for Windows
+
+**Important:** Windows builds require Administrator privileges due to symlink creation during the Next.js standalone build process.
+
+**Option 1: Using PowerShell Script (Recommended)**
+1. Right-click `build-windows.ps1` in the project root
+2. Select "Run with PowerShell"
+3. Click "Yes" when prompted for Administrator privileges
+4. The script will automatically check for admin rights and guide you through the build
+
+**Option 2: Using Batch Script**
+1. Right-click `build-windows.bat` in the project root
+2. Select "Run as administrator"
+3. The script will check for admin rights and run the build
+
+**Option 3: Manual Command (PowerShell as Administrator)**
+1. Open PowerShell as Administrator (Right-click → "Run as Administrator")
+2. Navigate to the project directory:
+   ```powershell
+   cd D:\path\to\team-project-4504-ydm
+   ```
+3. Run the build:
+   ```powershell
+   pnpm electron:build:win
+   ```
+
+**Option 4: Using the Build Script (Linux/WSL)**
+```bash
+./scripts/build-electron.sh win
+```
+
+**What Happens:**
+1. Builds the Next.js application in standalone mode
+2. Copies static assets to the standalone directory
+3. Packages everything into an `.exe` installer using electron-builder
+
+**Output:**
+- Location: `dist/ARCH Freight Calculator Setup 1.0.0.exe`
+- Users can double-click the `.exe` file to run the installer
+
+**Troubleshooting Windows Builds:**
+- **Symlink Permission Error**: Make sure you're running PowerShell/Terminal as Administrator
+- **Alternative**: Enable Windows Developer Mode (Settings → Privacy & Security → For developers → Developer Mode)
+
+#### Build Output Summary
+
+| Platform | Output File | Location | Size (Approx.) |
+|----------|-------------|----------|----------------|
+| macOS | `ARCH Freight Calculator-1.0.0.dmg` | `dist/` | ~250-500 MB |
+| Windows | `ARCH Freight Calculator Setup 1.0.0.exe` | `dist/` | ~140-200 MB |
+
+#### Testing the Build Locally
+
+1. **Install dependencies** (if not already done):
+   ```bash
+   pnpm install
+   ```
+
+2. **Build the application** using one of the methods above
+
+3. **Locate the installer** in the `dist/` directory
+
+4. **Test the installer:**
+   - **macOS**: Open the `.dmg` file and drag the app to Applications, then launch it
+   - **Windows**: Run the `.exe` installer, follow the installation wizard, then launch the app from Start menu
+
+5. **Verify functionality:**
+   - The GUI should load correctly
+   - Test uploading a CSV file
+   - Verify the packaging calculation works
+
+#### Notes
+
+- **Icon Files**: Custom icon files (`electron/icon.icns` for Mac and `electron/icon.ico` for Windows) can be added for production builds. The build will use default Electron icons if custom icons are not provided.
+- **Build Time**: First build may take 5-10 minutes as it downloads Electron binaries. Subsequent builds are faster.
+- **File Size**: The installers include the entire Next.js application and all dependencies, so they are relatively large.
+
+### Alpha Release Responsibilities
+
+#### Martin Rivera - GUI Development
+- **Graphical User Interface** (`app/gui/`, `app/api/`)
+  - Created minimal GUI with CSV upload functionality
+  - Implemented API route for backend processing
+  - Developed shared service layer to avoid CLI/GUI duplication
+  - Ensured GUI uses same dependencies as CLI (clean architecture)
+  - Verified no regression in existing CLI functionality
+
+#### Daniel Yan - Windows Build
+- **Windows Executable Build**
+  - Configure and test Windows build process locally
+  - Create Windows installer (.exe) using electron-builder
+  - Document Windows-specific build requirements
+  - Test one-click installation on Windows platform
+
+#### Yisu Wang - Mac Build
+- **macOS Executable Build**
+  - Configure and test macOS build process locally
+  - Create macOS installer (.dmg) using electron-builder
+  - Document macOS-specific build requirements (Xcode tools, etc.)
+  - Test one-click installation on macOS platform
+
 ## Module Ownership Checklist
 - **Input & Parsing Pipeline** (`cli/`, `app/parser/`, `app/requests/`)
   - Owner: @Daniel Yan
@@ -114,18 +271,38 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
   - Maintain response schema evolution as reporting needs change.
 
 ## Workflow Overview
-1. The CLI (`cli/main.ts`) parses command-line input, normalizes boolean flags, and invokes the CSV parser.
-2. `app/parser/CsvParser.ts` currently returns placeholder `Art` entities; it will later hydrate them from the provided CSV file.
+
+### Command Line Interface (CLI)
+1. The CLI (`cli/main.ts`) parses command-line input, normalizes boolean flags, and invokes the shared `PackagingService`.
+2. `PackagingService` validates the CSV file and parses art items using `app/parser/CsvParser.ts`.
 3. The resulting `PackagingRequest` aggregates art items, client metadata, and delivery capabilities, then reaches `PackagingInteractor`.
-4. `app/interactors/PackagingInteractor.ts` runs dummy packing functions that produce an empty `PackagingResponse` structure.
-5. The CLI prints the response as formatted JSON so downstream tooling or developers can inspect the output.
+4. `app/interactors/PackagingInteractor.ts` runs the packing algorithms and produces a `PackagingResponse` structure.
+5. The CLI prints the response as formatted text or JSON (if `--json-output` flag is used).
+
+### Graphical User Interface (GUI)
+1. The GUI (`app/gui/page.tsx`) presents a form for CSV upload and delivery configuration.
+2. On form submission, the GUI sends the data to the API route (`app/api/package/route.ts`).
+3. The API route saves the uploaded CSV to a temporary file and invokes the shared `PackagingService`.
+4. The `PackagingService` processes the request identically to the CLI workflow.
+5. The API returns the `PackagingResponse` as JSON, which the GUI displays in a user-friendly format.
+
+### Shared Service Layer
+Both CLI and GUI use the same `PackagingService` (`app/services/PackagingService.ts`) to avoid code duplication. This ensures:
+- Consistent business logic across delivery mechanisms
+- Single source of truth for packaging calculations
+- Easier testing and maintenance
 
 ## Project Structure Highlights
-- `app/entities` contains the domain entities with dummy implementations.
-- `app/interactors` defines the use-case orchestration.
-- `app/parser` isolates CSV parsing (currently a stub).
-- `app/requests` and `app/responses` host the DTOs that connect the CLI with the use cases.
-- `cli/main.ts` is the command-line entry point that wires parser, interactor, and response printing.
+- `app/entities` - Domain entities (`Art`, `Box`, `Crate`, etc.) with business logic
+- `app/interactors` - Use-case orchestration and packing algorithms
+- `app/parser` - CSV parsing and data validation
+- `app/services` - Shared service layer used by both CLI and GUI
+- `app/requests` and `app/responses` - DTOs for request/response data
+- `app/api` - Next.js API routes for GUI backend
+- `app/gui` - React-based graphical user interface
+- `cli/main.ts` - Command-line entry point
+- `electron/` - Electron configuration for desktop app
+- `scripts/` - Build and utility scripts
 
 ## Testing
 

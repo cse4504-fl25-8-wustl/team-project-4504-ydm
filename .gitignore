@@ -9,7 +9,7 @@ pnpm-debug.log*
 .next/
 out/
 build/
-dist/
+/dist
 
 # Environment variables
 .env
