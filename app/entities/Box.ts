@@ -39,10 +39,10 @@ const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
     innerWidth: 36,
     innerHeight: 11,
     tareWeight: 18,
-    maxShortSideInches: 36,
-    maxLongSideInches: 84,
-    telescopeMaxLengthInches: 84,
-    notes: "Most common size; telescope up to 84 inches on the long edge when one side ≤36 inches.",
+    maxShortSideInches: 36.5,
+    maxLongSideInches: 88,
+    telescopeMaxLengthInches: 88,
+    notes: "Most common size; telescope up to 88 inches on the long edge when one side ≤36.5 inches.",
   },
   [BoxType.Large]: {
     type: BoxType.Large,
@@ -51,8 +51,9 @@ const BOX_SPECIFICATIONS: Record<BoxType, BoxSpecification> = {
     innerHeight: 13,
     tareWeight: 22,
     maxShortSideInches: 43.5,
-    maxLongSideInches: 43.5,
-    notes: ">36 inches in both directions; intended for oversized pieces up to ~43.5 inches.",
+    maxLongSideInches: 88,
+    telescopeMaxLengthInches: 88,
+    notes: ">36.5 inches in both directions; can telescope up to 88 inches when short side ≤43.5 inches.",
   },
   [BoxType.UpsSmall]: {
     type: BoxType.UpsSmall,
@@ -180,6 +181,10 @@ export class Box {
     return this.oversizedPieces;
   }
 
+  public getCurrentProductType(): ArtType | undefined {
+    return this.currentProductType;
+  }
+
   public canAccommodate(art: Art): boolean {
     const type = art.getProductType();
 
@@ -211,8 +216,8 @@ export class Box {
       return false;
     }
 
-    // Only apply oversized piece limit if item requires oversize box (both dimensions >36")
-    // Items with one dimension ≤36" fit in standard boxes and use regular capacity limits
+    // Only apply oversized piece limit if item requires oversize box (both dimensions >36.5")
+    // Items with one dimension ≤36.5" fit in standard boxes and use regular capacity limits
     // Note: If product has a specific limit (e.g., PaperPrint = 6), use that instead of oversized limit
     // The oversized limit (3) only applies to products without specific limits
     if (PackagingRules.requiresOversizeBox(art)) {
@@ -257,7 +262,7 @@ export class Box {
 
     this.totalPieces += quantity;
 
-    // Only count as oversized if it requires oversize box (both dimensions >36")
+    // Only count as oversized if it requires oversize box (both dimensions >36.5")
     if (PackagingRules.requiresOversizeBox(art)) {
       this.oversizedPieces += quantity;
     }
@@ -349,7 +354,7 @@ export class Box {
 
   private fitsDimensions(art: Art): boolean {
     const footprint = PackagingRules.getPlanarFootprint(art);
-    const depth = art.getDepth();
+    const depth = art.getRawDimensions().height;
 
     switch (this.spec.type) {
       case BoxType.Standard: {
@@ -365,7 +370,11 @@ export class Box {
       }
 
       case BoxType.Large: {
-        if (footprint.longSide > this.spec.maxLongSideInches || footprint.shortSide > this.spec.maxShortSideInches) {
+        if (footprint.shortSide > this.spec.maxShortSideInches) {
+          return false;
+        }
+
+        if (footprint.longSide > (this.spec.telescopeMaxLengthInches ?? this.spec.maxLongSideInches)) {
           return false;
         }
 

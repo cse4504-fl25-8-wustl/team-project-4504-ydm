@@ -10,12 +10,15 @@ export class ArtTranslator {
     "print - framed with title plate": { type: ArtType.PaperPrintWithTitlePlate, material: ArtMaterial.Glass },
     "canvas - float frame": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasFramed },
     "canvas - gallery": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasGallery },
+    "canvas": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasFramed },
     "wall decor": { type: ArtType.WallDecor, material: ArtMaterial.Unknown },
     "wall décor": { type: ArtType.WallDecor, material: ArtMaterial.Unknown },
     "metal print": { type: ArtType.MetalPrint, material: ArtMaterial.Acrylic },
     "mirror": { type: ArtType.Mirror, material: ArtMaterial.Mirror },
     "acoustic panel": { type: ArtType.AcousticPanel, material: ArtMaterial.AcousticPanel },
+    "acoustic panels": { type: ArtType.AcousticPanel, material: ArtMaterial.AcousticPanel },
     "acoustic panel - framed": { type: ArtType.AcousticPanelFramed, material: ArtMaterial.AcousticPanelFramed },
+    "acoustic panels - framed": { type: ArtType.AcousticPanelFramed, material: ArtMaterial.AcousticPanelFramed },
     "patient board": { type: ArtType.PatientBoard, material: ArtMaterial.PatientBoard },
   };
 
