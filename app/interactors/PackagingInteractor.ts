@@ -101,7 +101,19 @@ export class PackagingInteractor {
     const assignments = new Map<string, { art: Art; box: Box }>();
     const unassignedReasons: Record<string, string> = {};
 
-    for (const art of artCollection) {
+    // Sort art by size (larger pieces first) to enable better consolidation
+    // This allows standard-size pieces to be packed into existing large boxes
+    const sortedArt = [...artCollection].sort((a, b) => {
+      const aFootprint = PackagingRules.getPlanarFootprint(a);
+      const bFootprint = PackagingRules.getPlanarFootprint(b);
+      // Sort by long side descending, then short side descending
+      if (aFootprint.longSide !== bFootprint.longSide) {
+        return bFootprint.longSide - aFootprint.longSide;
+      }
+      return bFootprint.shortSide - aFootprint.shortSide;
+    });
+
+    for (const art of sortedArt) {
       if (PackagingRules.needsCustomPackaging(art)) {
         unassignedArt.push(art);
         unassignedReasons[art.getId()] = "Requires custom packaging (both sides exceed 43.5\")";
@@ -178,6 +190,146 @@ export class PackagingInteractor {
       assignments,
       unassignedReasons,
     };
+  }
+
+  private packArtIntoCrates(artItems: Art[]): { crates: Crate[]; unassignedArt: Art[] } {
+    const crates: Crate[] = [];
+    const unassignedArt: Art[] = [];
+
+    // Group art by product type and stacking depth for consolidation
+    interface ArtWithCapacity {
+      art: Art;
+      quantity: number;
+      stackingDepth: number;
+      capacity: number;
+    }
+    
+    const groups = new Map<string, ArtWithCapacity[]>();
+    
+    // First pass: analyze each art piece and group by product type + stacking depth
+    for (const art of artItems) {
+      const footprint = PackagingRules.getPlanarFootprint(art);
+      const productType = art.getProductType();
+      
+      // Determine material depth
+      const isPaperPrint = productType === ArtType.PaperPrint || productType === ArtType.PaperPrintWithTitlePlate;
+      const isCanvas = productType === ArtType.CanvasFloatFrame;
+      const materialDepth = isPaperPrint ? 1.83334 : (isCanvas ? 2.5 : 2.0);
+      
+      // Determine stacking depth
+      let stackingDepth: number;
+      if (footprint.shortSide <= 36) {
+        stackingDepth = 46;
+      } else if (footprint.shortSide <= 46) {
+        stackingDepth = 36;
+      } else {
+        unassignedArt.push(art);
+        continue;
+      }
+      
+      const capacity = Math.floor(stackingDepth / materialDepth);
+      // Group by product type AND stacking depth
+      // Pieces with different stacking depths can't share a crate
+      const groupKey = `${productType}-${stackingDepth}`;
+      
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, []);
+      }
+      
+      groups.get(groupKey)!.push({
+        art,
+        quantity: art.getQuantity(),
+        stackingDepth,
+        capacity,
+      });
+    }
+    
+    // Second pass: try to consolidate groups with same product type
+    // Group by product type only for consolidation check
+    const productTypeGroups = new Map<ArtType, ArtWithCapacity[]>();
+    for (const [key, items] of groups.entries()) {
+      const productType = items[0].art.getProductType();
+      if (!productTypeGroups.has(productType)) {
+        productTypeGroups.set(productType, []);
+      }
+      productTypeGroups.get(productType)!.push(...items);
+    }
+    
+    // Pack each product type group
+    for (const group of productTypeGroups.values()) {
+      if (group.length === 0) continue;
+      
+      // Calculate total quantity and minimum capacity
+      const totalQty = group.reduce((sum, item) => sum + item.quantity, 0);
+      const minCapacity = Math.min(...group.map(item => item.capacity));
+      
+      // If total fits in one crate with min capacity, consolidate
+      // Otherwise, pack by stacking depth groups
+      if (totalQty <= minCapacity) {
+        // Consolidate all into one crate
+        const crate = new Crate({ type: CrateType.StandardCrate });
+        for (const item of group) {
+          const artForCrate = new Art({
+            id: `${item.art.getId()}-crate-${crates.length}`,
+            productType: item.art.getProductType(),
+            material: item.art.getMaterial(),
+            dimensions: item.art.getRawDimensions(),
+            quantity: item.quantity,
+          });
+          crate.addArt(artForCrate);
+        }
+        crates.push(crate);
+      } else {
+        // Pack by stacking depth groups
+        const depthGroups = new Map<number, ArtWithCapacity[]>();
+        for (const item of group) {
+          if (!depthGroups.has(item.stackingDepth)) {
+            depthGroups.set(item.stackingDepth, []);
+          }
+          depthGroups.get(item.stackingDepth)!.push(item);
+        }
+        
+        for (const depthGroup of depthGroups.values()) {
+          const capacity = depthGroup[0].capacity;
+          let currentCrate: Crate | null = null;
+          let currentCrateSpace = 0;
+          
+          for (const item of depthGroup) {
+            let remainingQty = item.quantity;
+            
+            while (remainingQty > 0) {
+              if (!currentCrate || currentCrateSpace === 0) {
+                if (currentCrate) {
+                  crates.push(currentCrate);
+                }
+                currentCrate = new Crate({ type: CrateType.StandardCrate });
+                currentCrateSpace = capacity;
+              }
+              
+              const qtyToPack = Math.min(remainingQty, currentCrateSpace);
+              
+              const artForCrate = new Art({
+                id: `${item.art.getId()}-crate-${crates.length}`,
+                productType: item.art.getProductType(),
+                material: item.art.getMaterial(),
+                dimensions: item.art.getRawDimensions(),
+                quantity: qtyToPack,
+              });
+              
+              currentCrate.addArt(artForCrate);
+              remainingQty -= qtyToPack;
+              currentCrateSpace -= qtyToPack;
+            }
+          }
+          
+          if (currentCrate) {
+            crates.push(currentCrate);
+          }
+        }
+      }
+    }
+    
+    return { crates, unassignedArt };
   }
 
   public packContainers(boxes: Box[], capabilities: DeliveryCapabilities): ContainerPackingResult {
@@ -378,8 +530,29 @@ export class PackagingInteractor {
   public packageEverything(request: PackagingRequest): PackagingResponse {
     const processingStart = Date.now();
 
-    const boxResult = this.packBoxes(request.artItems);
+    // If client accepts crates, pack directly into crates instead of boxes
+    let boxResult: BoxPackingResult;
+    let crateResult: { crates: Crate[]; unassignedArt: Art[] } = { crates: [], unassignedArt: [] };
+    
+    if (request.deliveryCapabilities.acceptsCrates) {
+      // Pack directly into crates, skip boxing
+      crateResult = this.packArtIntoCrates(request.artItems);
+      // Create empty box result
+      boxResult = {
+        boxes: [],
+        unassignedArt: crateResult.unassignedArt,
+        assignments: new Map(),
+        unassignedReasons: {},
+      };
+    } else {
+      // Normal boxing workflow
+      boxResult = this.packBoxes(request.artItems);
+    }
+    
     const containerResult = this.packContainers(boxResult.boxes, request.deliveryCapabilities);
+    
+    // Merge crates from direct art packing with crates from box packing
+    containerResult.containers.push(...crateResult.crates);
 
     const workOrderSummary = this.buildWorkOrderSummary(request.artItems);
     const weightSummary = this.buildWeightSummary(request.artItems, containerResult);
@@ -406,12 +579,27 @@ export class PackagingInteractor {
   }
 
   private findBoxForArt(boxes: Box[], art: Art, preferredType: BoxType): Box | undefined {
+    // First, try to find a box of the preferred type
     for (const box of boxes) {
       if (box.getType() === preferredType && box.canAccommodate(art)) {
         return box;
       }
     }
 
+    // For standard-size pieces, check if there's a Large box with the same product type
+    // This allows consolidation of mixed sizes in larger boxes
+    if (preferredType === BoxType.Standard) {
+      const productType = art.getProductType();
+      for (const box of boxes) {
+        if (box.getType() === BoxType.Large && 
+            box.getCurrentProductType() === productType && 
+            box.canAccommodate(art)) {
+          return box;
+        }
+      }
+    }
+
+    // Fallback: try any box that can accommodate
     for (const box of boxes) {
       if (box.canAccommodate(art)) {
         return box;
@@ -686,7 +874,7 @@ export class PackagingInteractor {
     request: PackagingRequest,
     boxResult: BoxPackingResult,
   ): BusinessIntelligenceSummary {
-    const oversizeFlags = this.buildOversizeFlags(boxResult.boxes);
+    const oversizeFlags = this.buildOversizeFlags(boxResult.boxes, boxResult.unassignedArt);
     const mediumsToFlag = this.identifyMediumsToFlag(boxResult);
 
     return {
@@ -701,9 +889,10 @@ export class PackagingInteractor {
     };
   }
 
-  private buildOversizeFlags(boxes: Box[]): OversizedItemFlag[] {
-    const oversizeMap = new Map<string, { quantity: number }>();
+  private buildOversizeFlags(boxes: Box[], unassignedArt: Art[]): OversizedItemFlag[] {
+    const oversizeMap = new Map<string, { quantity: number; recommendation: string }>();
 
+    // Check large boxes
     for (const box of boxes) {
       if (box.getType() !== BoxType.Large) {
         continue;
@@ -712,15 +901,27 @@ export class PackagingInteractor {
       const dims = box.getRequiredDimensions();
       const key = `${dims.length}\"x${dims.width}\"`;
       if (!oversizeMap.has(key)) {
-        oversizeMap.set(key, { quantity: 0 });
+        oversizeMap.set(key, { quantity: 0, recommendation: "Requires large box" });
       }
       oversizeMap.get(key)!.quantity += box.getContents().length;
+    }
+
+    // Check unassigned art for custom packaging needs
+    for (const art of unassignedArt) {
+      if (PackagingRules.needsCustomPackaging(art)) {
+        const footprint = PackagingRules.getPlanarFootprint(art);
+        const key = `${Math.round(footprint.longSide)}\"x${Math.round(footprint.shortSide)}\"`;
+        if (!oversizeMap.has(key)) {
+          oversizeMap.set(key, { quantity: 0, recommendation: "Requires custom packaging" });
+        }
+        oversizeMap.get(key)!.quantity += art.getQuantity();
+      }
     }
 
     return Array.from(oversizeMap.entries()).map(([dimensions, data]) => ({
       dimensions,
       quantity: data.quantity,
-      recommendation: "Requires large box",
+      recommendation: data.recommendation,
     }));
   }
 

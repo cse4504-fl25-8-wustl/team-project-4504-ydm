@@ -234,7 +234,7 @@ describe("Box Packing Logic", () => {
       expect(result.unassignedArt.length).toBe(0);
     });
 
-    test("85x43 should require custom packaging", () => {
+    test("85x43 should fit in large box (telescoping up to 88\")", () => {
       const art = new Art({
         id: "size-5",
         productType: ArtType.PaperPrint,
@@ -245,9 +245,10 @@ describe("Box Packing Logic", () => {
 
       const result = interactor.packBoxes([art]);
 
-      // 85" exceeds telescoping max (84"), and 43" exceeds standard box short side (36")
-      expect(result.boxes.length).toBe(0);
-      expect(result.unassignedArt.length).toBe(1);
+      // 85x43: both > 36.5", short side (43) ≤ 43.5", long side (85) ≤ 88" → fits in large box
+      expect(result.boxes.length).toBe(1);
+      expect(result.boxes[0].getType()).toBe(BoxType.Large);
+      expect(result.unassignedArt.length).toBe(0);
     });
   });
 

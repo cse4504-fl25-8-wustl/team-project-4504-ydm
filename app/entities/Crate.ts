@@ -1,4 +1,5 @@
 import { Box, BoxType } from "./Box";
+import { Art } from "./Art";
 
 export enum CrateType {
   StandardCrate,
@@ -75,6 +76,7 @@ export interface CrateOptions {
 export class Crate {
   private readonly spec: CrateSpecification;
   private readonly contents: Box[] = [];
+  private readonly looseArt: Art[] = []; // For direct art packing in crates
   private totalWeight: number;
 
   constructor(options: CrateOptions = {}) {
@@ -97,6 +99,20 @@ export class Crate {
 
   public getContents(): Box[] {
     return [...this.contents];
+  }
+
+  public getLooseArt(): Art[] {
+    return [...this.looseArt];
+  }
+
+  public addArt(art: Art): boolean {
+    this.looseArt.push(art);
+    // Add weight calculation for art
+    const dims = art.getDimensions();
+    const volume = dims.length * dims.width * dims.height;
+    const weight = volume * 0.1; // Rough estimate, adjust as needed
+    this.totalWeight += weight * art.getQuantity();
+    return true;
   }
 
   public canAccommodate(box: Box): boolean {

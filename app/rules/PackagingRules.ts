@@ -6,9 +6,9 @@ import { Art, ArtType, ArtMaterial } from "../entities/Art";
  */
 export class PackagingRules {
   // Box size constants - centralized to avoid magic numbers
-  private static readonly STANDARD_BOX_SIZE = 36;
+  private static readonly STANDARD_BOX_SIZE = 36.5;
   private static readonly LARGE_BOX_MAX_SIZE = 43.5;
-  private static readonly TELESCOPING_MAX_LENGTH = 84;
+  private static readonly TELESCOPING_MAX_LENGTH = 88;
 
   /**
    * Determines if an art piece requires special handling
@@ -41,15 +41,26 @@ export class PackagingRules {
 
   /**
    * Determines if an art piece requires an oversized box
+   * Large box required when:
+   * - Both dimensions > 36.5" (doesn't fit standard)
+   * - At least one dimension ≤ 43.5" (can fit in large box)
+   * - Long side ≤ 88" (within telescoping range)
    */
   public static requiresOversizeBox(art: Art): boolean {
     const footprint = this.getPlanarFootprint(art);
-    return (
-      footprint.longSide > this.STANDARD_BOX_SIZE &&
-      footprint.shortSide > this.STANDARD_BOX_SIZE &&
-      footprint.longSide <= this.LARGE_BOX_MAX_SIZE &&
-      footprint.shortSide <= this.LARGE_BOX_MAX_SIZE
-    );
+    
+    // Must not fit in standard box (both > 36.5")
+    if (footprint.longSide <= this.STANDARD_BOX_SIZE || footprint.shortSide <= this.STANDARD_BOX_SIZE) {
+      return false;
+    }
+    
+    // Must fit within telescoping range
+    if (footprint.longSide > this.TELESCOPING_MAX_LENGTH) {
+      return false;
+    }
+    
+    // At least one dimension must fit in large box (≤ 43.5")
+    return footprint.shortSide <= this.LARGE_BOX_MAX_SIZE || footprint.longSide <= this.LARGE_BOX_MAX_SIZE;
   }
 
   /**
@@ -66,17 +77,29 @@ export class PackagingRules {
 
   /**
    * Determines if an art piece needs custom packaging
+   * Custom packaging required when:
+   * - Both dimensions > 43.5", OR
+   * - Long side > 88" (exceeds telescoping max)
    */
   public static needsCustomPackaging(art: Art): boolean {
     const footprint = this.getPlanarFootprint(art);
-    return footprint.longSide > this.LARGE_BOX_MAX_SIZE && footprint.shortSide > this.LARGE_BOX_MAX_SIZE;
+    // Both dimensions exceed large box capacity
+    if (footprint.longSide > this.LARGE_BOX_MAX_SIZE && footprint.shortSide > this.LARGE_BOX_MAX_SIZE) {
+      return true;
+    }
+    // Long side exceeds telescoping maximum
+    if (footprint.longSide > this.TELESCOPING_MAX_LENGTH) {
+      return true;
+    }
+    return false;
   }
 
   /**
    * Gets the planar footprint of an art piece - centralized dimension sorting logic
+   * Uses raw dimensions (not rounded) for accurate box fitting
    */
   public static getPlanarFootprint(art: Art): { longSide: number; shortSide: number } {
-    const dims = art.getDimensions();
+    const dims = art.getRawDimensions();
     const ordered = [dims.length, dims.width].sort((a, b) => b - a);
     return {
       longSide: ordered[0],
