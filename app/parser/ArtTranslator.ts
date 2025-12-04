@@ -20,12 +20,27 @@ export class ArtTranslator {
     "acoustic panel - framed": { type: ArtType.AcousticPanelFramed, material: ArtMaterial.AcousticPanelFramed },
     "acoustic panels - framed": { type: ArtType.AcousticPanelFramed, material: ArtMaterial.AcousticPanelFramed },
     "patient board": { type: ArtType.PatientBoard, material: ArtMaterial.PatientBoard },
+    // Print variations with raised mounting
+    "print - raised mat": { type: ArtType.PaperPrint, material: ArtMaterial.Glass, defaultFlags: [SpecialHandlingFlag.RaisedFloat] },
+    "print - raised float mount": { type: ArtType.PaperPrint, material: ArtMaterial.Glass, defaultFlags: [SpecialHandlingFlag.RaisedFloat] },
+    "print - raised float mount with title plate": { type: ArtType.PaperPrintWithTitlePlate, material: ArtMaterial.Glass, defaultFlags: [SpecialHandlingFlag.RaisedFloat] },
+    "print - raised float mount and raised mat": { type: ArtType.PaperPrint, material: ArtMaterial.Glass, defaultFlags: [SpecialHandlingFlag.RaisedFloat] },
+    "print - raised float mount and deckled edge": { type: ArtType.PaperPrint, material: ArtMaterial.Glass, defaultFlags: [SpecialHandlingFlag.RaisedFloat] },
   };
 
   private static readonly GLAZING_MAP: Record<string, ArtMaterial> = {
     "regular glass": ArtMaterial.Glass,
-    glass: ArtMaterial.Glass,
-    acrylic: ArtMaterial.Acrylic,
+    "glass": ArtMaterial.Glass,
+    "acrylic": ArtMaterial.Acrylic,
+    // Additional glass types
+    "consv clear glass": ArtMaterial.Glass,
+    "museum glass": ArtMaterial.Glass,
+    "reflection control glass": ArtMaterial.Glass,
+    // Additional acrylic types
+    "regular acrylic": ArtMaterial.Acrylic,
+    "non-glare acrylic": ArtMaterial.Acrylic,
+    "mercy non-glare acrylic": ArtMaterial.Acrylic,
+    // Note: "no glass" is intentionally NOT mapped - it should use the finalMedium's default material
   };
 
   /**
