@@ -4,18 +4,106 @@ import type { PackagingResponse } from "../../responses/PackagingResponse";
 interface ReportViewsProps {
   response: PackagingResponse;
   onDownloadCSV: () => void;
+  onPreviewCSV: () => void;
   onReset: () => void;
+  currentAlgorithm: string;
+  onSwitchAlgorithm: (algorithm: string) => void;
+  onEditSettings: () => void;
 }
+
+const PACKING_ALGORITHMS = [
+  { id: "first-fit", name: "Pack by Medium" },
+  { id: "balanced", name: "Pack by Strictest Constraint" },
+  { id: "minimize-boxes", name: "Pack by Depth" }
+];
 
 export default function ReportViews({
   response,
   onDownloadCSV,
+  onPreviewCSV,
   onReset,
+  currentAlgorithm,
+  onSwitchAlgorithm,
+  onEditSettings,
 }: ReportViewsProps) {
   return (
     <div style={{ marginTop: "2rem" }}>
+      {/* Algorithm Switcher */}
+      <div style={{ 
+        marginBottom: "2rem", 
+        padding: "1.5rem", 
+        background: "white", 
+        borderRadius: "8px", 
+        border: "2px solid #e5e7eb" 
+      }}>
+        <h3 style={{ margin: "0 0 1rem 0", fontSize: "1rem", fontWeight: "600" }}>
+          Try Different Packing Methods
+        </h3>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          {PACKING_ALGORITHMS.map((algo) => (
+            <button
+              key={algo.id}
+              onClick={() => onSwitchAlgorithm(algo.id)}
+              disabled={currentAlgorithm === algo.id}
+              style={{
+                padding: "0.75rem 1.25rem",
+                background: currentAlgorithm === algo.id ? "#2563eb" : "white",
+                color: currentAlgorithm === algo.id ? "white" : "#374151",
+                border: currentAlgorithm === algo.id ? "2px solid #2563eb" : "2px solid #e5e7eb",
+                borderRadius: "8px",
+                fontSize: "0.875rem",
+                fontWeight: "600",
+                cursor: currentAlgorithm === algo.id ? "default" : "pointer",
+                transition: "all 0.2s ease",
+                opacity: currentAlgorithm === algo.id ? 1 : 0.8,
+              }}
+            >
+              {algo.name}
+              {currentAlgorithm === algo.id && " (Active)"}
+            </button>
+          ))}
+        </div>
+        <div style={{ 
+          marginTop: "0.75rem", 
+          fontSize: "0.75rem", 
+          color: "#6b7280" 
+        }}>
+          Click any method to instantly recalculate with the same data
+        </div>
+      </div>
+
       {/* Action Buttons */}
-      <div style={{ display: "flex", gap: "1rem", marginBottom: "2rem" }}>
+      <div style={{ display: "flex", gap: "1rem", marginBottom: "2rem", flexWrap: "wrap" }}>
+        <button
+          onClick={onEditSettings}
+          style={{
+            padding: "0.75rem 1.5rem",
+            background: "#f59e0b",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            fontWeight: "500",
+            cursor: "pointer",
+            fontSize: "1rem",
+          }}
+        >
+          Edit Settings
+        </button>
+        <button
+          onClick={onPreviewCSV}
+          style={{
+            padding: "0.75rem 1.5rem",
+            background: "#10b981",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            fontWeight: "500",
+            cursor: "pointer",
+            fontSize: "1rem",
+          }}
+        >
+          Preview CSV Report
+        </button>
         <button
           onClick={onDownloadCSV}
           style={{
@@ -65,11 +153,112 @@ export default function ReportViews({
             <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>Total Weight</div>
             <div style={{ fontSize: "1.75rem", fontWeight: "600" }}>{response.weightSummary.finalShipmentWeightLbs.toFixed(0)} lbs</div>
           </div>
+          <div style={{ padding: "1rem", background: "#f9fafb", borderRadius: "6px" }}>
+            <div style={{ fontSize: "0.875rem", color: "#6b7280", marginBottom: "0.5rem" }}>Boxes Needed</div>
+            <div style={{ fontSize: "1.75rem", fontWeight: "600" }}>{response.packingSummary.boxRequirements.reduce((sum, box) => sum + box.count, 0)}</div>
+          </div>
+          <div style={{ padding: "1rem", background: "#eff6ff", borderRadius: "6px", border: "1px solid #bfdbfe" }}>
+            <div style={{ fontSize: "0.875rem", color: "#1e40af", marginBottom: "0.5rem" }}>Packing Algorithm</div>
+            <div style={{ fontSize: "0.875rem", fontWeight: "600", color: "#1e3a8a" }}>{response.metadata.algorithmUsed}</div>
+          </div>
         </div>
 
-        {/* Box Requirements */}
+        {/* Box Contents Detail */}
         <div style={{ marginBottom: "2rem" }}>
-          <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "1rem" }}>Box Requirements</h3>
+          <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "1rem" }}>Box Contents</h3>
+          <div style={{ display: "grid", gap: "1rem" }}>
+            {response.packingSummary.boxContents.map((box, idx) => {
+              const isMixed = box.contents.length > 1;
+              return (
+                <div 
+                  key={idx} 
+                  style={{ 
+                    padding: "1rem", 
+                    background: isMixed ? "#fef3c7" : "#f0fdf4", 
+                    borderRadius: "8px",
+                    border: isMixed ? "2px solid #fbbf24" : "2px solid #86efac"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                    <div style={{ fontWeight: "600", fontSize: "1rem" }}>
+                      Box {box.boxNumber} - {box.boxType}
+                      {isMixed && <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", background: "#fbbf24", color: "#78350f", padding: "0.125rem 0.5rem", borderRadius: "4px", fontWeight: "600" }}>MIXED</span>}
+                    </div>
+                    <div style={{ fontSize: "0.875rem", fontWeight: "600", color: "#6b7280" }}>
+                      {box.totalPieces} pieces
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "0.875rem", color: "#374151", marginBottom: "0.75rem" }}>
+                    {box.contents.map((content, cidx) => (
+                      <div key={cidx} style={{ marginBottom: "0.25rem" }}>
+                        • <strong>{content.quantity}x</strong> {content.productType}
+                        {content.itemIds.length > 0 && (
+                          <span style={{ color: "#9ca3af", fontSize: "0.75rem", marginLeft: "0.5rem" }}>
+                            (Items: {content.itemIds.join(", ")})
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {box.specialHandling.length > 0 && (
+                    <div style={{ 
+                      marginTop: "0.75rem", 
+                      padding: "0.5rem", 
+                      background: "#fee2e2", 
+                      borderRadius: "4px",
+                      borderLeft: "3px solid #ef4444"
+                    }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: "600", color: "#991b1b", marginBottom: "0.25rem" }}>
+                        Special Handling:
+                      </div>
+                      {box.specialHandling.map((note, nidx) => (
+                        <div key={nidx} style={{ fontSize: "0.7rem", color: "#7f1d1d" }}>
+                          • {note}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {box.packingInstructions.length > 0 && (
+                    <div style={{ marginTop: "0.75rem" }}>
+                      <div style={{ fontSize: "0.75rem", fontWeight: "600", color: "#374151", marginBottom: "0.25rem" }}>
+                        Packing Instructions:
+                      </div>
+                      {box.packingInstructions.map((instruction, iidx) => (
+                        <div key={iidx} style={{ fontSize: "0.7rem", color: "#6b7280" }}>
+                          {iidx + 1}. {instruction}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div style={{ 
+                    marginTop: "0.75rem", 
+                    padding: "0.5rem", 
+                    background: "#f3f4f6", 
+                    borderRadius: "4px",
+                    fontFamily: "monospace",
+                    fontSize: "0.75rem",
+                    fontWeight: "600",
+                    color: "#1f2937"
+                  }}>
+                    LABEL: {box.label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {response.packingSummary.boxContents.some(b => b.contents.length > 1) && (
+            <div style={{ marginTop: "1rem", padding: "0.75rem", background: "#fef3c7", borderRadius: "6px", fontSize: "0.875rem", color: "#78350f" }}>
+              <strong>Note:</strong> Mixed boxes use the strictest capacity constraint of all mediums present.
+            </div>
+          )}
+        </div>
+
+        {/* Box Requirements Summary */}
+        <div style={{ marginBottom: "2rem" }}>
+          <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "1rem" }}>Box Requirements Summary</h3>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #e5e7eb" }}>

@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     const clientName = formData.get("clientName") as string;
     const jobSiteLocation = formData.get("jobSiteLocation") as string;
     const serviceType = formData.get("serviceType") as string;
+    const packingAlgorithm = (formData.get("packingAlgorithm") as string) || "first-fit";
     const acceptsPallets = formData.get("acceptsPallets") === "true";
     const acceptsCrates = formData.get("acceptsCrates") === "true";
     const hasLoadingDock = formData.get("hasLoadingDock") === "true";
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
       jobSiteLocation,
       serviceType,
       deliveryCapabilities,
+      packingAlgorithm,
       quiet: true,
     });
 

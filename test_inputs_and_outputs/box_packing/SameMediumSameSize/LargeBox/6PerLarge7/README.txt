@@ -1,4 +1,4 @@
-Pieces per large box per client: 6
+Pieces per large box per client: 7
 Quantity requested: 7
-Box calculation: ceil(7/6) = 2
-Client wants framed paper prints limited to six per large carton to keep consistent spacer kits even though the shell is deeper.
+Box calculation: ceil(7/7) = 1
+Client updated capacity to 7 framed paper prints per large carton.

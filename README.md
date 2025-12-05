@@ -70,14 +70,70 @@ The script exits non‑zero when any case fails, making it CI-friendly once both
 
 **Note:** The script uses `pnpm package` to run test cases and uses Node.js for JSON comparison (with `jq` as fallback if available), making it work on Windows/WSL environments.
 
+### Complete Test Suite
+Run **ALL** tests in the repository with a single command:
+
+```bash
+./run-complete-test-suite.sh
+```
+
+This comprehensive test runner executes:
+1. **Unit Tests** (Vitest) - All `*.test.ts` and `*.spec.ts` files
+2. **Box Packing Integration Tests** - Tests in `test_inputs_and_outputs/`
+3. **Pallet Packing Tests** - Tests in `test_data/pallet/`
+4. **Crate Packing Tests** - Tests in `test_cases/crate_packing/` (if available)
+5. **Stress Tests** - Strategy-aware tests in `test_cases/stress_tests/`
+
+The script continues running even if some tests fail and provides a comprehensive summary at the end.
+
+### Individual Test Suites
+
+#### Stress Tests
+The project includes a comprehensive stress test suite that validates different packing strategies:
+
+- **Run all stress tests:**
+  ```bash
+  ./run-stress-tests.sh
+  ```
+  
+  This script automatically:
+  - Detects the packing strategy based on test folder name
+  - Runs tests with the appropriate strategy (`first-fit`, `balanced`, or `minimize-boxes`)
+  - Compares JSON output against expected results
+  - Provides a summary of passed/failed tests
+  
+  **Test Categories:**
+  - `all/` - General tests (uses `first-fit` strategy)
+  - `no_mixed_medium_in_same_box/` - Tests for Pack by Medium strategy (`first-fit`)
+  - `pack_by_depth/` - Tests for Pack by Depth strategy (`minimize-boxes`)
+  - `strictest_constraint/` - Tests for Pack by Strictest Constraint strategy (`balanced`)
+
+#### Legacy Integration Tests
+- **Run box/pallet/crate tests individually:**
+  ```bash
+  ./run-all-tests.sh test_inputs_and_outputs  # Box packing tests
+  ./run-all-tests.sh test_data/pallet        # Pallet packing tests
+  ./run-all-tests.sh test_cases/crate_packing # Crate packing tests
+  ```
+
 ### Running the Application
 
 #### Command Line Interface (CLI)
 - Run the packaging workflow:
   ```bash
-  pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery> [--json-output <output-file>]
+  pnpm package <csv-file-path> <client-name> <job-site-location> <service-type> <accepts-pallets> <accepts-crates> <has-loading-dock> <requires-liftgate> <needs-inside-delivery> [--strategy <strategy-id>] [--json-output <output-file>]
   ```
   Boolean flags accept `yes/no`, `true/false`, `y/n`, or `1/0`.
+  
+  **Packing Strategy Options** (use with `--strategy` or `-s` flag):
+  - `first-fit` - Pack by Medium (no mixed mediums in same box) - **Default**
+  - `balanced` - Pack by Strictest Constraint (uses most restrictive limit when mixing)
+  - `minimize-boxes` - Pack by Depth (considers physical depth when stacking)
+  
+  Example with strategy:
+  ```bash
+  pnpm package input.csv "Client" "Location" "Delivery" yes no yes no no --strategy balanced
+  ```
 
 #### Graphical User Interface (GUI)
 - **Development mode** (with hot reload):

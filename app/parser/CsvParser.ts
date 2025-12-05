@@ -6,14 +6,20 @@ import { ArtTranslator } from "./ArtTranslator";
 
 const HEADER_ALIASES: Record<string, string> = {
   "line number": "lineNumber",
+  "linenumber": "lineNumber",
   quantity: "quantity",
   "tag #": "tagNumber",
   "tag number": "tagNumber",  // Accept both "tag #" and "tag number"
+  "tagnumber": "tagNumber",
   "final medium": "finalMedium",
+  "finalmedium": "finalMedium",
   "outside size width": "outsideWidth",
+  "outsidesizewidth": "outsideWidth",
   "outside size height": "outsideHeight",
+  "outsidesizeheight": "outsideHeight",
   glazing: "glazing",
   "frame 1 moulding": "frameMoulding",
+  "frame1moulding": "frameMoulding",
   hardware: "hardware",
 };
 
@@ -99,6 +105,12 @@ export async function parseWithDiagnostics(csvFilePath: string): Promise<ParseRe
         },
       }))
       .on('data', (row: Record<string, string>) => {
+        // Skip empty rows (all values are empty strings or whitespace)
+        const hasContent = Object.values(row).some(val => val && val.trim() !== '');
+        if (!hasContent) {
+          return;
+        }
+        
         totalRows++;
         
         try {

@@ -98,6 +98,26 @@ export interface ArtCreationOptions {
 
 const DEFAULT_DEPTH_PADDING_INCHES = 4;
 
+/**
+ * Get the material-specific stacking depth for an art type
+ * Based on actual physical thickness of different materials
+ */
+function getMaterialDepth(productType: ArtType): number {
+  const isPaperPrint = productType === ArtType.PaperPrint || productType === ArtType.PaperPrintWithTitlePlate;
+  const isCanvas = productType === ArtType.CanvasFloatFrame;
+  const isAcoustic = productType === ArtType.AcousticPanel || productType === ArtType.AcousticPanelFramed;
+  
+  if (isPaperPrint) {
+    return 1.83334; // Paper prints with glass/acrylic
+  } else if (isCanvas) {
+    return 2.75; // Canvas pieces
+  } else if (isAcoustic) {
+    return 2.75; // Acoustic panels (same as canvas per stress test)
+  } else {
+    return 2.0; // Default for other types
+  }
+}
+
 export class Art {
   private readonly id: string;
   private readonly productType: ArtType;
@@ -120,7 +140,8 @@ export class Art {
     this.material = options.material;
     this.length = options.dimensions.length;
     this.width = options.dimensions.width;
-    const depth = options.dimensions.height ?? DEFAULT_DEPTH_PADDING_INCHES;
+    // Use material-specific depth if not provided, otherwise use default padding
+    const depth = options.dimensions.height ?? getMaterialDepth(options.productType);
     this.depth = depth;
     this.quantity = options.quantity ?? 1;
     this.flags = new Set(options.specialHandlingFlags ?? []);

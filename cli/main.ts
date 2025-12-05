@@ -34,6 +34,15 @@ export async function main(): Promise<void> {
     args.splice(jsonOutputIndex, 2);
   }
 
+  // Check for optional --strategy flag
+  let packingAlgorithm: string | undefined;
+  const strategyIndex = args.findIndex(arg => arg === "--strategy" || arg === "-s");
+  if (strategyIndex !== -1 && strategyIndex + 1 < args.length) {
+    packingAlgorithm = args[strategyIndex + 1];
+    // Remove the flag and its value from args
+    args.splice(strategyIndex, 2);
+  }
+
   const [
     csvFilePath,
     clientName,
@@ -91,6 +100,7 @@ export async function main(): Promise<void> {
       jobSiteLocation,
       serviceType,
       deliveryCapabilities,
+      packingAlgorithm,
       jsonOutputPath,
     });
 

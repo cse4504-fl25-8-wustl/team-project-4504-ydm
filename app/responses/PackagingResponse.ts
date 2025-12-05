@@ -40,11 +40,26 @@ export interface HardwareBreakdown {
   totalPieces: number;
 }
 
+export interface BoxContentsDetail {
+  boxNumber: number;
+  boxType: string;
+  contents: Array<{
+    productType: string;
+    quantity: number;
+    itemIds: string[];
+  }>;
+  totalPieces: number;
+  specialHandling: string[];
+  packingInstructions: string[];
+  label: string;
+}
+
 export interface PackingSummary {
   boxRequirements: BoxRequirementSummary[];
   containerRequirements: ContainerRequirementSummary[];
   packedContainerDimensions: PackedContainerDimension[];
   hardware: HardwareBreakdown;
+  boxContents: BoxContentsDetail[];
 }
 
 export interface OversizedItemFlag {
@@ -63,6 +78,7 @@ export interface WorkOrderSummary {
   totalPieces: number;
   standardSizePieces: number;
   oversizedPieces: number;
+  customPieces: number;
   oversizedDetails: OversizedPieceDetail[];
 }
 

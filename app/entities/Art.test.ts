@@ -37,7 +37,7 @@ describe('Art', () => {
       const art = new Art(optionsWithoutHeight)
       const dimensions = art.getDimensions()
 
-      expect(dimensions.height).toBe(4) // DEFAULT_DEPTH_PADDING_INCHES
+      expect(dimensions.height).toBe(2) // Default depth for unspecified material
     })
 
     it('should set custom quantity when provided', () => {

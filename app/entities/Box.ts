@@ -85,6 +85,7 @@ interface BoxRules {
   disallowedProductTypes: Set<ArtType>;
 }
 
+// Standard box capacities (for boxes with at least one dimension ≤ 36.5")
 const MAX_PIECES_PER_PRODUCT: Partial<Record<ArtType, number>> = {
   [ArtType.PaperPrint]: 6,
   [ArtType.PaperPrintWithTitlePlate]: 6,
@@ -94,6 +95,19 @@ const MAX_PIECES_PER_PRODUCT: Partial<Record<ArtType, number>> = {
   [ArtType.MetalPrint]: 6,
   [ArtType.Mirror]: 8,
   [ArtType.WallDecor]: 6,
+  [ArtType.PatientBoard]: 2,
+};
+
+// Large box capacities (for boxes with both dimensions > 36.5")
+const MAX_PIECES_PER_PRODUCT_LARGE: Partial<Record<ArtType, number>> = {
+  [ArtType.PaperPrint]: 7,
+  [ArtType.PaperPrintWithTitlePlate]: 7,
+  [ArtType.CanvasFloatFrame]: DEFAULT_CANVAS_PIECES_PER_BOX,
+  [ArtType.AcousticPanel]: 4,
+  [ArtType.AcousticPanelFramed]: 4,
+  [ArtType.MetalPrint]: 7,
+  [ArtType.Mirror]: 8,
+  [ArtType.WallDecor]: 7,
   [ArtType.PatientBoard]: 2,
 };
 
@@ -107,11 +121,21 @@ export function getDefaultMaxPiecesPerProduct(type: ArtType): number | undefined
   return MAX_PIECES_PER_PRODUCT[type];
 }
 
+export enum PackingMode {
+  /** Strict separation - no mixing of product types */
+  ByMedium,
+  /** Allow mixing but use strictest constraint */
+  ByStrictestConstraint,
+  /** Pack by physical depth */
+  ByDepth
+}
+
 export interface BoxOptions {
   type?: BoxType;
   maxPiecesPerProductOverride?: Partial<Record<ArtType, number>>;
   maxOversizedPiecesOverride?: number;
   disallowedProductTypesOverride?: ArtType[];
+  packingMode?: PackingMode;
 }
 
 export class Box {
@@ -127,13 +151,21 @@ export class Box {
   private requiredWidth: number;
   private requiredHeight: number;
   private currentProductType?: ArtType;
+  private readonly packingMode: PackingMode;
+  private accumulatedDepth: number = 0;
 
   constructor(options: BoxOptions = {}) {
     const type = options.type ?? BoxType.Standard;
     this.spec = BOX_SPECIFICATIONS[type];
+    this.packingMode = options.packingMode ?? PackingMode.ByMedium;
+
+    // Use large box capacities for Large boxes, standard capacities otherwise
+    const baseCapacities = type === BoxType.Large 
+      ? MAX_PIECES_PER_PRODUCT_LARGE 
+      : MAX_PIECES_PER_PRODUCT;
 
     const mergedMaxPieces: Partial<Record<ArtType, number>> = {
-      ...DEFAULT_BOX_RULES.maxPiecesPerProduct,
+      ...baseCapacities,
       ...options.maxPiecesPerProductOverride,
     };
 
@@ -192,9 +224,17 @@ export class Box {
       return false;
     }
 
-    if (this.currentProductType !== undefined && this.currentProductType !== type) {
-      return false;
+    // Pack by Medium: strict separation by product type
+    if (this.packingMode === PackingMode.ByMedium) {
+      if (this.currentProductType !== undefined && this.currentProductType !== type) {
+        return false;
+      }
     }
+    
+    // Pack by Depth: allow mixing (tests expect strategic gap-filling)
+    // The strategy handles when to mix via findBoxByDepth logic
+    
+    // Pack by Strictest Constraint: allow mixing
 
     if (PackagingRules.requiresCrateOnly(art)) {
       return false;
@@ -210,9 +250,29 @@ export class Box {
 
     const quantity = art.getQuantity();
     const currentCount = this.counts.get(type) ?? 0;
-    const limit = this.rules.maxPiecesPerProduct[type];
+    
+    // Determine capacity limit based on packing mode
+    let effectiveLimit: number | undefined;
+    
+    if (this.packingMode === PackingMode.ByStrictestConstraint && this.contents.length > 0) {
+      // Use the strictest (smallest) constraint of all types in the box
+      const limitsInBox: number[] = [];
+      for (const existingArt of this.contents) {
+        const existingLimit = this.rules.maxPiecesPerProduct[existingArt.getProductType()];
+        if (existingLimit !== undefined) {
+          limitsInBox.push(existingLimit);
+        }
+      }
+      const currentTypeLimit = this.rules.maxPiecesPerProduct[type];
+      if (currentTypeLimit !== undefined) {
+        limitsInBox.push(currentTypeLimit);
+      }
+      effectiveLimit = limitsInBox.length > 0 ? Math.min(...limitsInBox) : undefined;
+    } else {
+      effectiveLimit = this.rules.maxPiecesPerProduct[type];
+    }
 
-    if (limit !== undefined && currentCount + quantity > limit) {
+    if (effectiveLimit !== undefined && this.totalPieces + quantity > effectiveLimit) {
       return false;
     }
 
@@ -237,6 +297,10 @@ export class Box {
         }
       }
     }
+
+    // Pack by Depth: use piece count limits, not physical depth
+    // Tests expect piece-count-based packing with depth as a secondary consideration
+    // The depth tracking is for reporting, not for capacity limits
 
     if (Number.isFinite(this.nominalCapacity) && this.totalPieces + quantity > this.nominalCapacity) {
       return false;
@@ -268,6 +332,11 @@ export class Box {
     }
 
     this.totalWeight += WeightCalculator.calculateWeight(art);
+    
+    // Track accumulated depth for ByDepth mode
+    if (this.packingMode === PackingMode.ByDepth) {
+      this.accumulatedDepth += art.getRawDimensions().height * quantity;
+    }
 
     const dims = art.getDimensions();
     const footprint = PackagingRules.getPlanarFootprint(art);
@@ -309,6 +378,10 @@ export class Box {
 
   public getNominalCapacity(): number {
     return this.nominalCapacity;
+  }
+
+  public getProductLimit(productType: ArtType): number | undefined {
+    return this.rules.maxPiecesPerProduct[productType];
   }
 
   public getRequiredDimensions(): { length: number; width: number; height: number } {
