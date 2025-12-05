@@ -455,7 +455,7 @@ describe('PackagingInteractor', () => {
 
       expect(response.metadata.processingTimeMs).toBeGreaterThanOrEqual(0)
       expect(response.metadata.timestamp).toBeDefined()
-      expect(response.metadata.algorithmUsed).toBe('box-first-fit/pallet-first-fit')
+      expect(response.metadata.algorithmUsed).toBe('Pack by Medium (No Mixed Mediums)')
     })
   })
 

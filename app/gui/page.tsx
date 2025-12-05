@@ -10,12 +10,34 @@ interface FormData {
   clientName: string;
   jobSiteLocation: string;
   serviceType: string;
+  packingAlgorithm: string;
   acceptsPallets: boolean;
   acceptsCrates: boolean;
   hasLoadingDock: boolean;
   requiresLiftgate: boolean;
   needsInsideDelivery: boolean;
 }
+
+const PACKING_ALGORITHMS = [
+  {
+    id: "first-fit",
+    name: "Pack by Medium",
+    description: "Keeps different art types separate. Each box contains only one medium (e.g., only paper prints or only canvas).",
+    bestFor: "When you need strict separation of art types for handling or delivery"
+  },
+  {
+    id: "balanced",
+    name: "Pack by Strictest Constraint",
+    description: "Uses the most restrictive packing limit when mixing art types. Ensures all items fit safely within the tightest constraint.",
+    bestFor: "Mixed orders where you want to maximize box utilization while respecting all constraints"
+  },
+  {
+    id: "minimize-boxes",
+    name: "Pack by Depth",
+    description: "Considers actual physical depth when stacking items. Checks if items will physically fit based on their thickness.",
+    bestFor: "When you need realistic physical packing that accounts for item thickness"
+  }
+];
 
 type ProcessingStatus = "idle" | "uploading" | "processing" | "complete" | "error";
 
@@ -25,6 +47,7 @@ export default function GuiPage() {
     clientName: "",
     jobSiteLocation: "",
     serviceType: "Delivery + Installation",
+    packingAlgorithm: "first-fit",
     acceptsPallets: true,
     acceptsCrates: false,
     hasLoadingDock: false,
@@ -35,6 +58,8 @@ export default function GuiPage() {
   const [status, setStatus] = useState<ProcessingStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [lastUploadedFile, setLastUploadedFile] = useState<File | null>(null);
+  const [showSettingsEditor, setShowSettingsEditor] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -94,6 +119,7 @@ export default function GuiPage() {
       formDataToSend.append("clientName", formData.clientName);
       formDataToSend.append("jobSiteLocation", formData.jobSiteLocation);
       formDataToSend.append("serviceType", formData.serviceType);
+      formDataToSend.append("packingAlgorithm", formData.packingAlgorithm);
       formDataToSend.append("acceptsPallets", String(formData.acceptsPallets));
       formDataToSend.append("acceptsCrates", String(formData.acceptsCrates));
       formDataToSend.append("hasLoadingDock", String(formData.hasLoadingDock));
@@ -115,14 +141,99 @@ export default function GuiPage() {
       const data = await res.json();
       setResponse(data.response);
       setStatus("complete");
+      setLastUploadedFile(file); // Save for re-processing
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred during processing");
       setStatus("error");
     }
   };
 
-  const downloadCSVReport = () => {
-    if (!response) return;
+  const reprocessWithCurrentSettings = async () => {
+    if (!lastUploadedFile) return;
+    
+    setStatus("processing");
+    setError(null);
+    setShowSettingsEditor(false);
+
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append("file", lastUploadedFile);
+      formDataToSend.append("clientName", formData.clientName);
+      formDataToSend.append("jobSiteLocation", formData.jobSiteLocation);
+      formDataToSend.append("serviceType", formData.serviceType);
+      formDataToSend.append("packingAlgorithm", formData.packingAlgorithm);
+      formDataToSend.append("acceptsPallets", String(formData.acceptsPallets));
+      formDataToSend.append("acceptsCrates", String(formData.acceptsCrates));
+      formDataToSend.append("hasLoadingDock", String(formData.hasLoadingDock));
+      formDataToSend.append("requiresLiftgate", String(formData.requiresLiftgate));
+      formDataToSend.append("needsInsideDelivery", String(formData.needsInsideDelivery));
+
+      const res = await fetch("/api/package", {
+        method: "POST",
+        body: formDataToSend,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to process file");
+      }
+
+      const data = await res.json();
+      setResponse(data.response);
+      setStatus("complete");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred during processing");
+      setStatus("error");
+    }
+  };
+
+  const switchPackingMethod = async (newAlgorithm: string) => {
+    if (!lastUploadedFile) return;
+    
+    // Update the algorithm
+    setFormData(prev => ({ ...prev, packingAlgorithm: newAlgorithm }));
+    
+    // Re-process with new algorithm
+    setStatus("processing");
+    setError(null);
+
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append("file", lastUploadedFile);
+      formDataToSend.append("clientName", formData.clientName);
+      formDataToSend.append("jobSiteLocation", formData.jobSiteLocation);
+      formDataToSend.append("serviceType", formData.serviceType);
+      formDataToSend.append("packingAlgorithm", newAlgorithm);
+      formDataToSend.append("acceptsPallets", String(formData.acceptsPallets));
+      formDataToSend.append("acceptsCrates", String(formData.acceptsCrates));
+      formDataToSend.append("hasLoadingDock", String(formData.hasLoadingDock));
+      formDataToSend.append("requiresLiftgate", String(formData.requiresLiftgate));
+      formDataToSend.append("needsInsideDelivery", String(formData.needsInsideDelivery));
+
+      const res = await fetch("/api/package", {
+        method: "POST",
+        body: formDataToSend,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to process file");
+      }
+
+      const data = await res.json();
+      setResponse(data.response);
+      setStatus("complete");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred during processing");
+      setStatus("error");
+    }
+  };
+
+  const [showCsvPreview, setShowCsvPreview] = useState(false);
+  const [csvPreviewContent, setCsvPreviewContent] = useState("");
+
+  const generateCSVContent = (): string => {
+    if (!response) return "";
     
     let csvContent = "";
     const date = new Date();
@@ -150,6 +261,35 @@ export default function GuiPage() {
     if (response.packingSummary.containerRequirements.length > 0) {
       csvContent += `"Pallets/Crates","${response.packingSummary.containerRequirements.reduce((sum, c) => sum + c.count, 0)}"\n`;
     }
+    csvContent += `"Packing Algorithm","${response.metadata.algorithmUsed}"\n`;
+    csvContent += `\n`;
+    
+    // Box Contents Summary with Detailed Instructions
+    csvContent += `"━━━ BOX PACKING GUIDE ━━━"\n`;
+    response.packingSummary.boxContents.forEach(box => {
+      csvContent += `\n`;
+      csvContent += `"${box.label}"\n`;
+      csvContent += `"Contents:","",""\n`;
+      box.contents.forEach(c => {
+        csvContent += `"  ${c.quantity}x ${c.productType}","Items: ${c.itemIds.join(', ')}",""\n`;
+      });
+      csvContent += `"Total Pieces:","${box.totalPieces}",""\n`;
+      
+      if (box.specialHandling.length > 0) {
+        csvContent += `"","",""\n`;
+        csvContent += `"SPECIAL HANDLING:","",""\n`;
+        box.specialHandling.forEach(note => {
+          csvContent += `"  ⚠ ${note}","",""\n`;
+        });
+      }
+      
+      csvContent += `"","",""\n`;
+      csvContent += `"PACKING INSTRUCTIONS:","",""\n`;
+      box.packingInstructions.forEach((instruction, idx) => {
+        csvContent += `"  ${idx + 1}. ${instruction}","",""\n`;
+      });
+      csvContent += `"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"\n`;
+    });
     csvContent += `\n`;
     
     // Detailed Breakdown
@@ -177,6 +317,7 @@ export default function GuiPage() {
       csvContent += `"${box.label}","${box.dimensions}","${box.count}"\n`;
     });
     csvContent += `\n`;
+    
     
     // Containers
     if (response.packingSummary.containerRequirements.length > 0) {
@@ -256,6 +397,11 @@ export default function GuiPage() {
       csvContent += `"Warnings","${response.metadata.warnings.join('; ')}"\n`;
     }
     
+    return csvContent;
+  };
+
+  const downloadCSVReport = () => {
+    const csvContent = generateCSVContent();
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -271,6 +417,17 @@ export default function GuiPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const previewCSVReport = () => {
+    const csvContent = generateCSVContent();
+    // Remove quotes for better readability in preview
+    const readableContent = csvContent
+      .replace(/^"|"$/gm, '') // Remove quotes at start/end of lines
+      .replace(/","/g, ' | ') // Replace "," with |
+      .replace(/"/g, ''); // Remove remaining quotes
+    setCsvPreviewContent(readableContent);
+    setShowCsvPreview(true);
   };
 
   const resetForm = () => {
@@ -512,6 +669,75 @@ export default function GuiPage() {
                   </select>
                 </div>
 
+                {/* Packing Algorithm */}
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ 
+                    display: "block", 
+                    marginBottom: "0.75rem", 
+                    fontWeight: "500",
+                    fontSize: "0.875rem",
+                    color: "#334155"
+                  }}>
+                    Packing Method
+                  </label>
+                  <div style={{ 
+                    display: "grid", 
+                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                    gap: "0.75rem" 
+                  }}>
+                    {PACKING_ALGORITHMS.map((algo) => (
+                      <label
+                        key={algo.id}
+                        style={{
+                          display: "block",
+                          padding: "1rem",
+                          border: formData.packingAlgorithm === algo.id ? "2px solid #2563eb" : "2px solid #e2e8f0",
+                          borderRadius: "8px",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          background: formData.packingAlgorithm === algo.id ? "#eff6ff" : "white",
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="packingAlgorithm"
+                          value={algo.id}
+                          checked={formData.packingAlgorithm === algo.id}
+                          onChange={handleInputChange}
+                          style={{ display: "none" }}
+                        />
+                        <div style={{ display: "flex", alignItems: "start", gap: "0.75rem" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ 
+                              fontWeight: "600", 
+                              color: "#0f172a",
+                              marginBottom: "0.25rem",
+                              fontSize: "0.875rem"
+                            }}>
+                              {algo.name}
+                            </div>
+                            <div style={{ 
+                              fontSize: "0.75rem", 
+                              color: "#64748b",
+                              marginBottom: "0.5rem",
+                              lineHeight: "1.4"
+                            }}>
+                              {algo.description}
+                            </div>
+                            <div style={{ 
+                              fontSize: "0.7rem", 
+                              color: "#2563eb",
+                              fontWeight: "500"
+                            }}>
+                              Best for: {algo.bestFor}
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Delivery Capabilities */}
                 <div style={{ gridColumn: "1 / -1" }}>
                   <fieldset style={{ 
@@ -651,12 +877,276 @@ export default function GuiPage() {
             </div>
           )}
 
+          {/* CSV Preview Modal */}
+          {showCsvPreview && (
+            <div style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              padding: "2rem"
+            }}>
+              <div style={{
+                background: "white",
+                borderRadius: "12px",
+                maxWidth: "900px",
+                width: "100%",
+                maxHeight: "80vh",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+              }}>
+                <div style={{
+                  padding: "1.5rem",
+                  borderBottom: "1px solid #e2e8f0",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}>
+                  <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "600" }}>CSV Report Preview</h3>
+                  <button
+                    onClick={() => setShowCsvPreview(false)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      fontSize: "1.5rem",
+                      cursor: "pointer",
+                      color: "#64748b",
+                      padding: "0.25rem"
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div style={{
+                  padding: "1.5rem",
+                  overflow: "auto",
+                  flex: 1
+                }}>
+                  <pre style={{
+                    background: "#f8fafc",
+                    padding: "1rem",
+                    borderRadius: "6px",
+                    fontSize: "0.75rem",
+                    lineHeight: "1.5",
+                    margin: 0,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word"
+                  }}>
+                    {csvPreviewContent}
+                  </pre>
+                </div>
+                <div style={{
+                  padding: "1.5rem",
+                  borderTop: "1px solid #e2e8f0",
+                  display: "flex",
+                  gap: "1rem",
+                  justifyContent: "flex-end"
+                }}>
+                  <button
+                    onClick={downloadCSVReport}
+                    style={{
+                      padding: "0.625rem 1.25rem",
+                      background: "linear-gradient(135deg, #2563eb 0%, #1e40af 100%)",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      fontSize: "0.875rem",
+                      cursor: "pointer",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Download CSV
+                  </button>
+                  <button
+                    onClick={() => setShowCsvPreview(false)}
+                    style={{
+                      padding: "0.625rem 1.25rem",
+                      background: "white",
+                      color: "#64748b",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "6px",
+                      fontSize: "0.875rem",
+                      cursor: "pointer",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Editor Modal */}
+          {showSettingsEditor && status === "complete" && (
+            <div style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              padding: "2rem"
+            }}>
+              <div style={{
+                background: "white",
+                borderRadius: "12px",
+                maxWidth: "600px",
+                width: "100%",
+                maxHeight: "80vh",
+                overflow: "auto",
+                boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)"
+              }}>
+                <div style={{
+                  padding: "1.5rem",
+                  borderBottom: "1px solid #e2e8f0",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}>
+                  <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "600" }}>Edit Settings</h3>
+                  <button
+                    onClick={() => setShowSettingsEditor(false)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      fontSize: "1.5rem",
+                      cursor: "pointer",
+                      color: "#64748b"
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div style={{ padding: "1.5rem" }}>
+                  <div style={{ display: "grid", gap: "1.5rem" }}>
+                    {/* Service Type */}
+                    <div>
+                      <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "500", fontSize: "0.875rem" }}>
+                        Service Type
+                      </label>
+                      <select
+                        name="serviceType"
+                        value={formData.serviceType}
+                        onChange={handleInputChange}
+                        style={{ padding: "0.625rem", width: "100%", border: "1px solid #cbd5e1", borderRadius: "6px" }}
+                      >
+                        <option value="Delivery + Installation">Delivery + Installation</option>
+                        <option value="Delivery Only">Delivery Only</option>
+                        <option value="Installation Only">Installation Only</option>
+                      </select>
+                    </div>
+
+                    {/* Delivery Capabilities */}
+                    <div>
+                      <div style={{ fontWeight: "500", marginBottom: "0.75rem", fontSize: "0.875rem" }}>
+                        Delivery Capabilities
+                      </div>
+                      <div style={{ display: "grid", gap: "0.75rem" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            name="acceptsPallets"
+                            checked={formData.acceptsPallets}
+                            onChange={handleInputChange}
+                          />
+                          <span style={{ fontSize: "0.875rem" }}>Accepts Pallets</span>
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            name="acceptsCrates"
+                            checked={formData.acceptsCrates}
+                            onChange={handleInputChange}
+                          />
+                          <span style={{ fontSize: "0.875rem" }}>Accepts Crates</span>
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            name="hasLoadingDock"
+                            checked={formData.hasLoadingDock}
+                            onChange={handleInputChange}
+                          />
+                          <span style={{ fontSize: "0.875rem" }}>Has Loading Dock</span>
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            name="requiresLiftgate"
+                            checked={formData.requiresLiftgate}
+                            onChange={handleInputChange}
+                          />
+                          <span style={{ fontSize: "0.875rem" }}>Requires Liftgate</span>
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            name="needsInsideDelivery"
+                            checked={formData.needsInsideDelivery}
+                            onChange={handleInputChange}
+                          />
+                          <span style={{ fontSize: "0.875rem" }}>Needs Inside Delivery</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  padding: "1.5rem",
+                  borderTop: "1px solid #e2e8f0",
+                  display: "flex",
+                  gap: "1rem",
+                  justifyContent: "flex-end"
+                }}>
+                  <button
+                    onClick={() => setShowSettingsEditor(false)}
+                    style={{
+                      padding: "0.625rem 1.25rem",
+                      background: "white",
+                      color: "#64748b",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={reprocessWithCurrentSettings}
+                    style={{
+                      padding: "0.625rem 1.25rem",
+                      background: "#2563eb",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontWeight: "600"
+                    }}
+                  >
+                    Apply & Recalculate
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Report Views - Only show when complete */}
           {status === "complete" && response && (
             <ReportViews
               response={response}
               onDownloadCSV={downloadCSVReport}
+              onPreviewCSV={previewCSVReport}
               onReset={resetForm}
+              currentAlgorithm={formData.packingAlgorithm}
+              onSwitchAlgorithm={switchPackingMethod}
+              onEditSettings={() => setShowSettingsEditor(true)}
             />
           )}
         </div>

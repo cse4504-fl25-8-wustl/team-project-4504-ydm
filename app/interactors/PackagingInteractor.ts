@@ -4,6 +4,8 @@ import { Crate, CrateType, ContainerKind } from "../entities/Crate";
 import { DeliveryCapabilities, PackagingRequest } from "../requests/PackagingRequest";
 import { PackagingRules } from "../rules/PackagingRules";
 import { WeightCalculator } from "../calculations/WeightCalculator";
+import { PackingStrategy } from "../strategies/PackingStrategy";
+import { PackingStrategyFactory } from "../strategies/PackingStrategyFactory";
 import {
   PackagingResponse,
   WeightSummary,
@@ -35,6 +37,27 @@ const MAX_PALLET_HEIGHT_IN = 84;
 const OVERSIZE_PIECES_PER_BOX = 3;
 
 export class PackagingInteractor {
+  private packingStrategy: PackingStrategy;
+
+  constructor(strategyId?: string) {
+    this.packingStrategy = strategyId 
+      ? PackingStrategyFactory.getStrategy(strategyId)
+      : PackingStrategyFactory.getDefaultStrategy();
+  }
+
+  /**
+   * Set the packing strategy to use
+   */
+  public setPackingStrategy(strategyId: string): void {
+    this.packingStrategy = PackingStrategyFactory.getStrategy(strategyId);
+  }
+
+  /**
+   * Get the current packing strategy metadata
+   */
+  public getPackingStrategyMetadata() {
+    return this.packingStrategy.getMetadata();
+  }
   /**
    * Splits an Art object with large quantity into smaller Art objects
    * that can fit within box capacity limits
@@ -96,100 +119,8 @@ export class PackagingInteractor {
   }
 
   public packBoxes(artCollection: Art[]): BoxPackingResult {
-    const boxes: Box[] = [];
-    const unassignedArt: Art[] = [];
-    const assignments = new Map<string, { art: Art; box: Box }>();
-    const unassignedReasons: Record<string, string> = {};
-
-    // Sort art by size (larger pieces first) to enable better consolidation
-    // This allows standard-size pieces to be packed into existing large boxes
-    const sortedArt = [...artCollection].sort((a, b) => {
-      const aFootprint = PackagingRules.getPlanarFootprint(a);
-      const bFootprint = PackagingRules.getPlanarFootprint(b);
-      // Sort by long side descending, then short side descending
-      if (aFootprint.longSide !== bFootprint.longSide) {
-        return bFootprint.longSide - aFootprint.longSide;
-      }
-      return bFootprint.shortSide - aFootprint.shortSide;
-    });
-
-    for (const art of sortedArt) {
-      if (PackagingRules.needsCustomPackaging(art)) {
-        unassignedArt.push(art);
-        unassignedReasons[art.getId()] = "Requires custom packaging (both sides exceed 43.5\")";
-        continue;
-      }
-
-      if (PackagingRules.requiresCrateOnly(art)) {
-        unassignedArt.push(art);
-        unassignedReasons[art.getId()] = "Crate-only item; palletization handled later";
-        continue;
-      }
-
-      const preferredType = PackagingRules.requiresOversizeBox(art) ? BoxType.Large : BoxType.Standard;
-      
-      // Check if this art needs to be split due to quantity limits
-      // Try to add to existing box first
-      let targetBox = this.findBoxForArt(boxes, art, preferredType);
-      
-      if (targetBox && targetBox.canAccommodate(art)) {
-        // Can fit in existing box
-        targetBox.addArt(art);
-        assignments.set(art.getId(), { art, box: targetBox });
-      } else {
-        // Need to create new box(es) - potentially split if quantity is too large
-        const tempBox = new Box({ type: preferredType });
-        
-        if (tempBox.canAccommodate(art)) {
-          // Fits in a single new box
-          tempBox.addArt(art);
-          boxes.push(tempBox);
-          assignments.set(art.getId(), { art, box: tempBox });
-        } else {
-          // Doesn't fit - need to split the art across multiple boxes
-          // This happens when quantity exceeds box capacity
-
-          // Determine split size based on art type and box rules
-          // Query the box for the maximum pieces per product type
-          const maxQuantity = this.determineMaxPiecesPerBox(art, preferredType);
-          const splits = this.splitArtByQuantity(art, maxQuantity);
-          
-          for (const splitArt of splits) {
-            let splitBox = this.findBoxForArt(boxes, splitArt, preferredType);
-            
-            if (!splitBox) {
-              splitBox = new Box({ type: preferredType });
-              if (!splitBox.canAccommodate(splitArt) || !splitBox.addArt(splitArt)) {
-                unassignedArt.push(splitArt);
-                unassignedReasons[splitArt.getId()] = "Cannot accommodate even after splitting";
-                continue;
-              }
-              boxes.push(splitBox);
-            } else {
-              if (!splitBox.addArt(splitArt)) {
-                // Existing box full, create new one
-                splitBox = new Box({ type: preferredType });
-                if (!splitBox.canAccommodate(splitArt) || !splitBox.addArt(splitArt)) {
-                  unassignedArt.push(splitArt);
-                  unassignedReasons[splitArt.getId()] = "Cannot accommodate even after splitting";
-                  continue;
-                }
-                boxes.push(splitBox);
-              }
-            }
-            
-            assignments.set(splitArt.getId(), { art: splitArt, box: splitBox });
-          }
-        }
-      }
-    }
-
-    return {
-      boxes,
-      unassignedArt,
-      assignments,
-      unassignedReasons,
-    };
+    // Delegate to the selected packing strategy
+    return this.packingStrategy.packBoxes(artCollection);
   }
 
   private packArtIntoCrates(artItems: Art[]): { crates: Crate[]; unassignedArt: Art[] } {
@@ -563,7 +494,7 @@ export class PackagingInteractor {
     const metadata: PackagingResponseMetadata = {
       warnings: this.buildWarnings(boxResult.boxes),
       errors: this.buildErrorMessages(boxResult, containerResult),
-      algorithmUsed: "box-first-fit/pallet-first-fit",
+      algorithmUsed: this.packingStrategy.getMetadata().algorithmName,
       processingTimeMs: Date.now() - processingStart,
       timestamp: new Date().toISOString(),
     };
@@ -759,13 +690,86 @@ export class PackagingInteractor {
     const containerRequirements: ContainerRequirementSummary[] = this.summarizeContainers(containerResult.containers);
     const packedContainerDimensions: PackedContainerDimension[] = this.buildContainerDimensions(containerResult.containers);
     const hardware = this.summarizeHardware(boxResult);
+    const boxContents = this.buildBoxContents(boxResult.boxes);
 
     return {
       boxRequirements,
       containerRequirements,
       packedContainerDimensions,
       hardware,
+      boxContents,
     };
+  }
+
+  private buildBoxContents(boxes: Box[]): Array<{
+    boxNumber: number;
+    boxType: string;
+    contents: Array<{ productType: string; quantity: number; itemIds: string[] }>;
+    totalPieces: number;
+    specialHandling: string[];
+    packingInstructions: string[];
+    label: string;
+  }> {
+    return boxes.map((box, index) => {
+      const contents = box.getContents();
+      const contentsSummary = new Map<string, { quantity: number; itemIds: string[] }>();
+      const specialHandling: string[] = [];
+      const packingInstructions: string[] = [];
+      
+      // Group by product type and collect item IDs
+      for (const art of contents) {
+        const typeName = art.getProductTypeLabel();
+        if (!contentsSummary.has(typeName)) {
+          contentsSummary.set(typeName, { quantity: 0, itemIds: [] });
+        }
+        const entry = contentsSummary.get(typeName)!;
+        entry.quantity += art.getQuantity();
+        entry.itemIds.push(art.getId());
+        
+        // Add special handling notes
+        if (art.getMaterial() === 0 || art.getMaterial() === 1) { // Glass or Acrylic
+          if (!specialHandling.includes("FRAGILE - Contains glass/acrylic")) {
+            specialHandling.push("FRAGILE - Contains glass/acrylic");
+          }
+        }
+        if (art.getProductType() === 7) { // Mirror
+          if (!specialHandling.includes("MIRROR - Handle with extreme care")) {
+            specialHandling.push("MIRROR - Handle with extreme care");
+          }
+        }
+      }
+      
+      // Generate packing instructions
+      const isMixed = contentsSummary.size > 1;
+      if (isMixed) {
+        packingInstructions.push("Mixed mediums - pack heavier items on bottom");
+      }
+      if (specialHandling.length > 0) {
+        packingInstructions.push("Wrap each piece individually with protective material");
+        packingInstructions.push("Use corner protectors for framed pieces");
+      }
+      packingInstructions.push("Fill empty spaces with packing material to prevent shifting");
+      packingInstructions.push("Mark 'THIS SIDE UP' on box exterior");
+      
+      // Generate box label
+      const boxType = this.describeBoxType(box.getType());
+      const contentTypes = Array.from(contentsSummary.keys()).join(" + ");
+      const label = `BOX ${index + 1} - ${boxType} - ${contentTypes}`;
+      
+      return {
+        boxNumber: index + 1,
+        boxType,
+        contents: Array.from(contentsSummary.entries()).map(([productType, data]) => ({
+          productType,
+          quantity: data.quantity,
+          itemIds: data.itemIds,
+        })),
+        totalPieces: box.getTotalPieces(),
+        specialHandling,
+        packingInstructions,
+        label,
+      };
+    });
   }
 
   private summarizeBoxes(boxes: Box[]): BoxRequirementSummary[] {

@@ -13,6 +13,10 @@ export interface PackagingJobOptions {
   serviceType: string;
   deliveryCapabilities: DeliveryCapabilities;
   /**
+   * Packing algorithm strategy ID (e.g., "first-fit", "balanced", "minimize-boxes")
+   */
+  packingAlgorithm?: string;
+  /**
    * When true, suppresses non-critical log output (useful for automated tests).
    */
   quiet?: boolean;
@@ -43,6 +47,7 @@ export class PackagingService {
       jobSiteLocation,
       serviceType,
       deliveryCapabilities,
+      packingAlgorithm,
       quiet = false,
       jsonOutputPath,
     } = options;
@@ -74,7 +79,7 @@ export class PackagingService {
       deliveryCapabilities,
     };
 
-    const interactor = new PackagingInteractor();
+    const interactor = new PackagingInteractor(packingAlgorithm);
     const response = interactor.packageEverything(request);
 
     // Calculate total piece count by summing quantities from all art items
