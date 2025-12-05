@@ -1,6 +1,24 @@
 # team-project-4504-ydm
 team-project-4504-ydm was created by GitHub Classroom.
 
+## Running the App on macOS
+
+If you download the app from GitHub Releases and see **"App is damaged and can't be opened"**, this is because the app is not signed with an Apple Developer certificate.
+
+**To fix this, run the following command in Terminal:**
+
+```bash
+xattr -cr /Applications/ARCH\ Freight\ Calculator.app
+```
+
+Or if the app is in your Downloads folder:
+
+```bash
+xattr -cr ~/Downloads/ARCH\ Freight\ Calculator.app
+```
+
+After running this command, you can open the app normally.
+
 ## Developer Guide
 - Requires Node.js 20+, pnpm, and the workspace devDependencies. Install prerequisites:
   ```bash
