@@ -12,7 +12,7 @@ export interface OversizedPiece {
 export interface JsonOutputSchema {
   total_pieces: number;
   standard_size_pieces: number;
-  oversized_pieces: OversizedPiece[];
+  oversized_pieces?: OversizedPiece[];
   standard_box_count: number;
   large_box_count: number;
   custom_piece_count: number;

@@ -40,27 +40,35 @@ export class PackagingRules {
   }
 
   /**
-   * Determines if an art piece requires an oversized box
+   * Determines if an art piece requires an oversized (large) box
    * Large box required when:
-   * - Both dimensions > 36.5" (doesn't fit standard)
-   * - At least one dimension ≤ 43.5" (can fit in large box)
+   * - Long side > 43.5" (exceeds standard box capacity even with telescoping)
    * - Long side ≤ 88" (within telescoping range)
+   * - Short side ≤ 43.5" (can fit in large box)
    */
   public static requiresOversizeBox(art: Art): boolean {
     const footprint = this.getPlanarFootprint(art);
     
-    // Must not fit in standard box (both > 36.5")
-    if (footprint.longSide <= this.STANDARD_BOX_SIZE || footprint.shortSide <= this.STANDARD_BOX_SIZE) {
+    // First check if it fits in a standard box (shortSide ≤ 36.5")
+    // Standard boxes can telescope up to 88" on the long side
+    if (footprint.shortSide <= this.STANDARD_BOX_SIZE) {
+      // Fits in standard box (possibly telescoping)
       return false;
     }
     
-    // Must fit within telescoping range
-    if (footprint.longSide > this.TELESCOPING_MAX_LENGTH) {
-      return false;
+    // If shortSide > 36.5", check if it needs a large box
+    // Large box required if both dimensions > 36.5" but both ≤ 43.5"
+    if (footprint.longSide <= this.LARGE_BOX_MAX_SIZE && footprint.shortSide <= this.LARGE_BOX_MAX_SIZE) {
+      return true; // Both > 36.5" but both ≤ 43.5", needs large box
     }
     
-    // At least one dimension must fit in large box (≤ 43.5")
-    return footprint.shortSide <= this.LARGE_BOX_MAX_SIZE || footprint.longSide <= this.LARGE_BOX_MAX_SIZE;
+    // If longSide > 43.5" but shortSide > 36.5", check if it fits in large box with telescoping
+    if (footprint.longSide > this.LARGE_BOX_MAX_SIZE && footprint.longSide <= this.TELESCOPING_MAX_LENGTH) {
+      // Can fit in large box if shortSide ≤ 43.5"
+      return footprint.shortSide <= this.LARGE_BOX_MAX_SIZE;
+    }
+    
+    return false; // Needs custom packaging
   }
 
   /**
@@ -105,6 +113,16 @@ export class PackagingRules {
       longSide: ordered[0],
       shortSide: ordered[1],
     };
+  }
+
+  /**
+   * Determines if an art piece fits in a standard box
+   * Standard box: at least one dimension ≤ 36.5"
+   */
+  public static fitsInStandardBox(art: Art): boolean {
+    const footprint = this.getPlanarFootprint(art);
+    // Fits in standard box if at least one dimension is ≤ 36.5"
+    return footprint.shortSide <= this.STANDARD_BOX_SIZE;
   }
 
   /**

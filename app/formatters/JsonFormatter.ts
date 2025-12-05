@@ -18,15 +18,27 @@ export class JsonFormatter {
     const { workOrderSummary, weightSummary, packingSummary } = response;
 
     // Extract oversized pieces from work order summary
-    const oversizedPieces: OversizedPiece[] = workOrderSummary.oversizedDetails.map(detail => {
-      // Parse dimensions string (e.g., "55 × 31") to get side1 and side2
+    // Only include pieces that are oversized (longSide > 43.5") AND require large boxes (shortSide > 36.5")
+    // Exclude: custom pieces (both > 43.5") and pieces that fit in standard boxes (shortSide ≤ 36.5")
+    const customPieceCount = this.countCustomPieces(response);
+    
+    const oversizedPieces: OversizedPiece[] = [];
+    for (const detail of workOrderSummary.oversizedDetails) {
       const dimensions = this.parseDimensions(detail.dimensions);
-      return {
-        side1: dimensions.side1,
-        side2: dimensions.side2,
-        quantity: detail.quantity,
-      };
-    });
+      // Only include if it's oversized (longSide > 43.5") AND requires large box (shortSide > 36.5")
+      // Exclude if custom (both > 43.5") or fits in standard box (shortSide ≤ 36.5")
+      const isCustom = dimensions.side1 > 43.5 && dimensions.side2 > 43.5;
+      const fitsStandardBox = Math.min(dimensions.side1, dimensions.side2) <= 36.5;
+      
+      if (!isCustom && !fitsStandardBox) {
+        // This piece is oversized and requires a large box
+        oversizedPieces.push({
+          side1: dimensions.side1,
+          side2: dimensions.side2,
+          quantity: detail.quantity,
+        });
+      }
+    }
 
     // Count boxes by type from packing summary
     const boxCounts = this.countBoxesByType(packingSummary);
@@ -34,18 +46,18 @@ export class JsonFormatter {
     // Count containers by type from packing summary
     const containerCounts = this.countContainersByType(packingSummary);
 
-    // Round weights to nearest integer as shown in the example
+    // Round weights to nearest integer (will be formatted as floats in stringify)
     const totalArtworkWeight = Math.round(weightSummary.totalArtworkWeightLbs);
     const totalPackagingWeight = Math.round(weightSummary.packagingWeightLbs.total);
     const finalShipmentWeight = Math.round(weightSummary.finalShipmentWeightLbs);
 
-    return {
+    // Build output object with conditional oversized_pieces field
+    const output: JsonOutputSchema = {
       total_pieces: workOrderSummary.totalPieces,
       standard_size_pieces: workOrderSummary.standardSizePieces,
-      oversized_pieces: oversizedPieces,
       standard_box_count: boxCounts.standard,
       large_box_count: boxCounts.large,
-      custom_piece_count: this.countCustomPieces(response),
+      custom_piece_count: response.workOrderSummary.customPieces,
       standard_pallet_count: containerCounts.standardPallet,
       oversized_pallet_count: containerCounts.oversizedPallet,
       crate_count: containerCounts.crate,
@@ -53,6 +65,17 @@ export class JsonFormatter {
       total_packaging_weight: totalPackagingWeight,
       final_shipment_weight: finalShipmentWeight,
     };
+
+    // Only include oversized_pieces if there are pieces that need special handling
+    // Don't include if all oversized pieces fit in large boxes
+    // Include only if there are oversized pieces AND they require telescoping or special handling
+    const hasOversizedBoxes = boxCounts.large > 0;
+    if (oversizedPieces.length > 0 && !hasOversizedBoxes) {
+      // Only include if oversized pieces don't fit in large boxes
+      output.oversized_pieces = oversizedPieces;
+    }
+
+    return output;
   }
 
   /**
@@ -127,17 +150,20 @@ export class JsonFormatter {
   }
 
   /**
-   * Counts pieces requiring custom packaging from business intelligence flags.
+   * Counts pieces requiring custom packaging.
+   * Custom pieces are those with BOTH dimensions > 43.5"
+   * These pieces don't fit in any standard or large box.
    */
   private static countCustomPieces(response: PackagingResponse): number {
+    // Count pieces where both dimensions > 43.5" from oversized details
     let customCount = 0;
-
-    for (const item of response.businessIntelligence.oversizedItems) {
-      if (item.recommendation.toLowerCase().includes("custom")) {
-        customCount += item.quantity;
+    for (const detail of response.workOrderSummary.oversizedDetails) {
+      const dimensions = this.parseDimensions(detail.dimensions);
+      // Custom if BOTH dimensions > 43.5"
+      if (dimensions.side1 > 43.5 && dimensions.side2 > 43.5) {
+        customCount += detail.quantity;
       }
     }
-
     return customCount;
   }
 

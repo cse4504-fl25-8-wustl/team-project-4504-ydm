@@ -29,17 +29,34 @@ export class MinimizeBoxesStrategy implements PackingStrategy {
     const assignments = new Map<string, { art: Art; box: Box }>();
     const unassignedReasons: Record<string, string> = {};
 
-    // Sort by size descending
-    const sortedArt = [...artCollection].sort((a, b) => {
-      const aFootprint = PackagingRules.getPlanarFootprint(a);
-      const bFootprint = PackagingRules.getPlanarFootprint(b);
-      if (aFootprint.longSide !== bFootprint.longSide) {
-        return bFootprint.longSide - aFootprint.longSide;
-      }
-      return bFootprint.shortSide - aFootprint.shortSide;
-    });
+    const largeBoxArt: Art[] = [];
+    const standardBoxArt: Art[] = [];
 
-    for (const art of sortedArt) {
+    for (const art of artCollection) {
+      if (PackagingRules.requiresOversizeBox(art)) {
+        largeBoxArt.push(art);
+      } else {
+        standardBoxArt.push(art);
+      }
+    }
+
+    // PASS 1: Pack large box items first
+    const remainingStandardArt = this.packArtItems(largeBoxArt, boxes, assignments, unassignedArt, unassignedReasons);
+    
+    // PASS 2: Fill partial boxes with standard items, then pack remaining standard items
+    this.packArtItems(standardBoxArt, boxes, assignments, unassignedArt, unassignedReasons);
+
+    return { boxes, unassignedArt, assignments, unassignedReasons };
+  }
+
+  private packArtItems(
+    artItems: Art[],
+    boxes: Box[],
+    assignments: Map<string, { art: Art; box: Box }>,
+    unassignedArt: Art[],
+    unassignedReasons: Record<string, string>
+  ): void {
+    for (const art of artItems) {
       if (PackagingRules.needsCustomPackaging(art)) {
         unassignedArt.push(art);
         unassignedReasons[art.getId()] = "Requires custom packaging (both sides exceed 43.5\")";
@@ -54,8 +71,13 @@ export class MinimizeBoxesStrategy implements PackingStrategy {
 
       const preferredType = PackagingRules.requiresOversizeBox(art) ? BoxType.Large : BoxType.Standard;
       
-      // Find box with most remaining capacity that can still accommodate
-      let targetBox = this.findBoxByDepth(boxes, art, preferredType);
+      // First try to find ANY box (any type) that can accommodate this art
+      let targetBox = this.findBoxByDepthAnyType(boxes, art);
+      
+      // If no cross-type box found, try preferred type only
+      if (!targetBox) {
+        targetBox = this.findBoxByDepth(boxes, art, preferredType);
+      }
       
       if (targetBox && targetBox.canAccommodate(art)) {
         targetBox.addArt(art);
@@ -72,7 +94,10 @@ export class MinimizeBoxesStrategy implements PackingStrategy {
           const splits = this.splitArtByQuantity(art, maxQuantity);
           
           for (const splitArt of splits) {
-            let splitBox = this.findBoxByDepth(boxes, splitArt, preferredType);
+            let splitBox = this.findBoxByDepthAnyType(boxes, splitArt);
+            if (!splitBox) {
+              splitBox = this.findBoxByDepth(boxes, splitArt, preferredType);
+            }
             
             if (!splitBox) {
               splitBox = new Box({ type: preferredType, packingMode: PackingMode.ByDepth });
@@ -99,50 +124,35 @@ export class MinimizeBoxesStrategy implements PackingStrategy {
         }
       }
     }
-
-    return { boxes, unassignedArt, assignments, unassignedReasons };
   }
 
-  private findBoxByDepth(boxes: Box[], art: Art, preferredType: BoxType): Box | undefined {
-    // Check if art will fit based on depth/height constraints
-    // The Box class already checks height in fitsDimensions, so we rely on canAccommodate
-    
-    // First try boxes of preferred type
-    for (const box of boxes) {
-      if (box.getType() === preferredType && box.canAccommodate(art)) {
-        // Additional depth check: ensure the box has physical space
-        const boxDims = box.getRequiredDimensions();
-        const artDims = art.getRawDimensions();
-        
-        // Check if adding this art's depth would exceed box height
-        if (boxDims.height + artDims.height <= box.getSpecification().innerHeight) {
-          return box;
-        }
-      }
-    }
-
-    // For standard-size pieces, check Large boxes
-    if (preferredType === BoxType.Standard) {
-      for (const box of boxes) {
-        if (box.getType() === BoxType.Large && box.canAccommodate(art)) {
-          const boxDims = box.getRequiredDimensions();
-          const artDims = art.getRawDimensions();
-          
-          if (boxDims.height + artDims.height <= box.getSpecification().innerHeight) {
-            return box;
-          }
-        }
-      }
-    }
-
-    // Fallback: any box that can accommodate
-    for (const box of boxes) {
+  private findBoxByDepthAnyType(boxes: Box[], art: Art): Box | undefined {
+    // Find the LAST box of ANY type that can still fit this art
+    // This allows cross-type gap-filling (e.g., standard items in large boxes)
+    for (let i = boxes.length - 1; i >= 0; i--) {
+      const box = boxes[i];
       if (box.canAccommodate(art)) {
         return box;
       }
     }
-
     return undefined;
+  }
+
+  private findBoxByDepth(boxes: Box[], art: Art, preferredType: BoxType): Box | undefined {
+    // Find the LAST box of preferred type that can still fit this art
+    // This implements sequential gap-filling: fill the most recent partial box first
+    let bestBox: Box | undefined;
+    
+    // Search backwards to find the most recent box that can fit this art
+    for (let i = boxes.length - 1; i >= 0; i--) {
+      const box = boxes[i];
+      if (box.getType() === preferredType && box.canAccommodate(art)) {
+        bestBox = box;
+        break; // Take the first (most recent) match
+      }
+    }
+
+    return bestBox;
   }
 
   private splitArtByQuantity(art: Art, maxQuantity: number): Art[] {
@@ -182,16 +192,23 @@ export class MinimizeBoxesStrategy implements PackingStrategy {
   }
 
   private determineMaxPiecesPerBox(art: Art, preferredType: BoxType): number {
-    const typeLimit = getDefaultMaxPiecesPerProduct(art.getProductType());
-    if (typeLimit !== undefined) {
-      return typeLimit;
+    // Create a temp box of the preferred type to get its capacity for this specific product
+    const tempBox = new Box({ type: preferredType });
+    
+    // Try to get the product-specific limit from the box's rules
+    const productType = art.getProductType();
+    let productLimit = tempBox.getProductLimit(productType);
+    
+    if (productLimit !== undefined && Number.isFinite(productLimit)) {
+      return productLimit;
     }
 
+    // Fallback to checking if it requires oversize box
     if (PackagingRules.requiresOversizeBox(art)) {
       return OVERSIZE_PIECES_PER_BOX;
     }
 
-    const tempBox = new Box({ type: preferredType });
+    // Last resort: use nominal capacity
     const nominal = tempBox.getNominalCapacity();
     if (Number.isFinite(nominal) && nominal > 0) {
       return nominal;

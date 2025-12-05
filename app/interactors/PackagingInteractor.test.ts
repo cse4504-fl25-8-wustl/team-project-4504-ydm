@@ -176,22 +176,22 @@ describe('PackagingInteractor', () => {
       })
     })
 
-    it('splits large paper prints based on the 6-per-box rule even in large cartons', () => {
+    it('splits large paper prints based on the 7-per-box rule in large cartons', () => {
       const largePrints = new Art({
         id: 'ART-LARGE-PAPER',
         productType: ArtType.PaperPrint,
         material: ArtMaterial.Glass,
         dimensions: { length: 42, width: 40, height: 2 },
-        quantity: 7,
+        quantity: 8,
       })
 
       const result = interactor.packBoxes([largePrints])
       const totalPieces = result.boxes.reduce((sum, box) => sum + box.getTotalPieces(), 0)
 
-      expect(totalPieces).toBe(7)
+      expect(totalPieces).toBe(8)
       result.boxes.forEach((box) => {
         expect(box.getType()).toBe(BoxType.Large)
-        expect(box.getTotalPieces()).toBeLessThanOrEqual(6)
+        expect(box.getTotalPieces()).toBeLessThanOrEqual(7)
       })
     })
 

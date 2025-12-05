@@ -166,16 +166,22 @@ export class FirstFitPackingStrategy implements PackingStrategy {
   }
 
   private determineMaxPiecesPerBox(art: Art, preferredType: BoxType): number {
-    const typeLimit = getDefaultMaxPiecesPerProduct(art.getProductType());
-    if (typeLimit !== undefined) {
-      return typeLimit;
+    // Create a temp box of the preferred type to get its capacity for this specific product
+    const tempBox = new Box({ type: preferredType });
+    
+    // Try to get the product-specific limit from the box's rules
+    const productType = art.getProductType();
+    const productLimit = tempBox.getProductLimit(productType);
+    if (productLimit !== undefined && Number.isFinite(productLimit)) {
+      return productLimit;
     }
 
+    // Fallback to checking if it requires oversize box
     if (PackagingRules.requiresOversizeBox(art)) {
       return OVERSIZE_PIECES_PER_BOX;
     }
 
-    const tempBox = new Box({ type: preferredType });
+    // Last resort: use nominal capacity
     const nominal = tempBox.getNominalCapacity();
     if (Number.isFinite(nominal) && nominal > 0) {
       return nominal;

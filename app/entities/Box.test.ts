@@ -58,7 +58,7 @@ describe("Box", () => {
       const largeBox = new Box({ type: BoxType.Large });
       const oversizeBundle = makeArt({
         dimensions: { length: 42, width: 40, height: 4 },
-        quantity: 6,
+        quantity: 7,
       });
 
       expect(largeBox.addArt(oversizeBundle)).toBe(true);

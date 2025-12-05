@@ -9,6 +9,7 @@ export class ArtTranslator {
     "paper print - framed": { type: ArtType.PaperPrint, material: ArtMaterial.Glass },
     "print - framed with title plate": { type: ArtType.PaperPrintWithTitlePlate, material: ArtMaterial.Glass },
     "canvas - float frame": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasFramed },
+    "canvas - framed": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasFramed },
     "canvas - gallery": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasGallery },
     "canvas": { type: ArtType.CanvasFloatFrame, material: ArtMaterial.CanvasFramed },
     "wall decor": { type: ArtType.WallDecor, material: ArtMaterial.Unknown },

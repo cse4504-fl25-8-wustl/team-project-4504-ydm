@@ -78,6 +78,7 @@ export interface WorkOrderSummary {
   totalPieces: number;
   standardSizePieces: number;
   oversizedPieces: number;
+  customPieces: number;
   oversizedDetails: OversizedPieceDetail[];
 }
 

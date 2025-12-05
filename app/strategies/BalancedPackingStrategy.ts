@@ -54,8 +54,13 @@ export class BalancedPackingStrategy implements PackingStrategy {
 
       const preferredType = PackagingRules.requiresOversizeBox(art) ? BoxType.Large : BoxType.Standard;
       
-      // Find box with lightest weight that can accommodate
-      let targetBox = this.findBoxWithStrictestConstraint(boxes, art, preferredType);
+      // First try to find ANY box that can accommodate (cross-type gap-filling)
+      let targetBox = this.findBoxWithStrictestConstraintAnyType(boxes, art);
+      
+      // If no cross-type box found, try preferred type only
+      if (!targetBox) {
+        targetBox = this.findBoxWithStrictestConstraint(boxes, art, preferredType);
+      }
       
       if (targetBox && targetBox.canAccommodate(art)) {
         targetBox.addArt(art);
@@ -72,7 +77,10 @@ export class BalancedPackingStrategy implements PackingStrategy {
           const splits = this.splitArtByQuantity(art, maxQuantity);
           
           for (const splitArt of splits) {
-            let splitBox = this.findBoxWithStrictestConstraint(boxes, splitArt, preferredType);
+            let splitBox = this.findBoxWithStrictestConstraintAnyType(boxes, splitArt);
+            if (!splitBox) {
+              splitBox = this.findBoxWithStrictestConstraint(boxes, splitArt, preferredType);
+            }
             
             if (!splitBox) {
               splitBox = new Box({ type: preferredType, packingMode: PackingMode.ByStrictestConstraint });
@@ -101,6 +109,24 @@ export class BalancedPackingStrategy implements PackingStrategy {
     }
 
     return { boxes, unassignedArt, assignments, unassignedReasons };
+  }
+
+  private findBoxWithStrictestConstraintAnyType(boxes: Box[], art: Art): Box | undefined {
+    // Find box with lightest weight that can accommodate (any type)
+    let bestBox: Box | undefined;
+    let minWeight = Infinity;
+
+    for (const box of boxes) {
+      if (box.canAccommodate(art)) {
+        const weight = box.getTotalWeight();
+        if (weight < minWeight) {
+          minWeight = weight;
+          bestBox = box;
+        }
+      }
+    }
+
+    return bestBox;
   }
 
   private findBoxWithStrictestConstraint(boxes: Box[], art: Art, preferredType: BoxType): Box | undefined {
